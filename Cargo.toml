@@ -1,0 +1,45 @@
+[workspace]
+resolver = "2"
+members = [
+    "cli",
+    "desktop",
+    "core",
+]
+
+# Optional: You can define default package metadata that all
+# workspace members will inherit. This helps keep things consistent.
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["DG"]
+description = "Secondary Mind: AI-powered codebase analysis and development guidance."
+
+
+# Optional: To reduce duplication and ensure version consistency, you can
+# define shared dependencies here. Crates in the workspace can then
+# inherit them by using `dependency-name = { workspace = true }`.
+[workspace.dependencies]
+# Error Handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Code Analysis & Git
+git2 = "0.18"
+
+# SWC for AST Parsing (JavaScript/TypeScript)
+swc_core = { version = "0.90", features = ["ecma_visit", "ecma_parser", "ecma_ast"] }
+swc_common = "0.33"
+
+# AI Integration & Serialization
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Utilities
+log = "0.4"
+env_logger = "0.11"
+tokio = { version = "1", features = ["full"] }
+walkdir = "2"
+regex = "1"
+lazy_static = "1.4.0"
+dotenvy = "0.15"

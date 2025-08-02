@@ -1,0 +1,28 @@
+# cli/Cargo.toml
+
+[package]
+name = "secondary-mind-engine"
+description = "Core engine for the Secondary Mind developer assistant."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+# Link to the new core library
+secondary-mind-core = { path = "../core" }
+
+# CLI-specific dependency for the REPL
+rustyline = "14.0"
+
+# Workspace dependencies required by main.rs
+anyhow = { workspace = true }
+tokio = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+dotenvy = { workspace = true }
+walkdir = { workspace = true }
+
+
+[[bin]]
+name = "smind"
+path = "main.rs" # <-- CORRECTED PATH (was src/main.rs)

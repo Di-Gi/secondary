@@ -1,0 +1,32 @@
+[package]
+name = "secondary-mind-core"
+description = "Core engine for the Secondary Mind developer assistant."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+# Common dependencies are inherited from the root workspace.
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+git2 = { workspace = true }
+swc_core = { workspace = true }
+swc_common = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+tokio = { workspace = true }
+walkdir = { workspace = true }
+regex = { workspace = true }
+lazy_static = { workspace = true }
+dotenvy = { workspace = true }
+
+# New dependencies for persistent storage
+dirs = "5.0"
+chrono = { version = "0.4", features = ["serde"] }
+
+# New dependency for Rust code parsing
+syn = { version = "2.0", features = ["full", "visit", "extra-traits"] }
+proc-macro2 = { version = "1.0", features = ["span-locations"] }

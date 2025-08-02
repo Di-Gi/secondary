@@ -1,0 +1,33 @@
+# desktop/Cargo.toml
+
+[package]
+name = "secondary-mind-desktop"
+description = "Desktop application for Secondary Mind developer assistant."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[build-dependencies]
+# Tauri-specific build dependency
+tauri-build = { version = "1.0", features = [] }
+
+[dependencies]
+# Link to the new core library
+secondary-mind-core = { path = "../core" }
+
+# Tauri-specific framework dependency
+tauri = { version = "1.0", features = ["protocol-asset", "dialog-open", "fs-read-file", "fs-write-file", "fs-read-dir", "fs-exists", "path-all", "shell-open"] }
+
+# Workspace dependencies required by the desktop binary/library itself
+tokio = { workspace = true }
+serde = { workspace = true }
+walkdir = { workspace = true }
+log = { workspace = true } # Optional, for logging within desktop-specific code
+env_logger = { workspace = true } # Optional
+dotenvy = { workspace = true } # Optional
+chrono = "0.4.41"
+serde_json.workspace = true
+
+[[bin]]
+name = "secondary-mind-desktop"
+path = "src/main.rs"

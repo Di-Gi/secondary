@@ -10,4 +10,9 @@ pub mod model;
 pub use components::{
     home_directory_manager::HomeDirectoryManager,
     project_configuration_service::{ProjectConfig, ProjectConfigurationService, ProjectSettings, RecentProjects},
+    session_manager::{SessionManager, SessionConfig, SessionInfo, CleanupResult},
 };
+
+// Re-export enhanced project config types
+pub use components::enhanced_project_config::*;
+pub use model::session::{ProjectSession, OpenFile, Bookmark, ChatMessage, WorkspaceLayout};

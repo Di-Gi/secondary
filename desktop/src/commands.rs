@@ -4,13 +4,16 @@
 // Dependencies: [secondary-mind-core (for all models and logic), Tauri, WalkDir.]
 use secondary_mind_core::{
     components::{
-        ai_synthesis_core::AISynthesisCore,
-        codebase_cartographer::CodebaseCartographer,
+        enhanced_analysis_engine::{EnhancedAnalysisEngine, AnalysisResult as CoreAnalysisResult},
+        enhanced_ai_synthesis_core::{EnhancedAISynthesisCore, ContextBuilder},
+        search_index_manager::{SearchIndexManager, SearchFilters, SearchScope},
+        session_manager::SessionManager,
+        file_system_watcher::FileSystemWatcher,
         code_source_controller::CodeSourceController,
         project_configuration_service::ProjectConfigurationService,
         home_directory_manager::HomeDirectoryManager,
     },
-    model::{project::Project, symbol::Symbol}, // Direct import from core
+    model::{project::Project, symbol::Symbol, session::ProjectSession},
     ProjectConfig, RecentProjects,
 };
 use crate::AppState;
@@ -22,10 +25,13 @@ use serde::{Serialize, Deserialize};
 
 #[derive(serde::Serialize)]
 pub struct AnalysisResult {
-    pub symbols: Vec<Symbol>, // Now uses Symbol from core
+    pub symbols: Vec<Symbol>,
     pub git_status: Option<(String, String)>,
     pub project_path: String,
     pub project_config: ProjectConfig,
+    pub analysis_time: String,
+    pub file_count: usize,
+    pub cache_hit_rate: f64,
 }
 
 #[derive(serde::Serialize)]
@@ -43,6 +49,20 @@ pub struct ProjectNote {
     pub last_modified: chrono::DateTime<chrono::Utc>,
     pub tags: Vec<String>,
     pub is_favorited: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SearchRequest {
+    pub query: String,
+    pub filters: Option<SearchFilters>,
+    pub max_results: Option<usize>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AIRequest {
+    pub query: String,
+    pub context: Option<ContextBuilder>,
+    pub response_type: String,
 }
 
 #[tauri::command]
@@ -66,9 +86,11 @@ pub async fn analyze_project(
     let path = PathBuf::from(&project_path);
     let mut project = Project::new(&path).map_err(|e| e.to_string())?;
     
-    let cartographer = CodebaseCartographer::new();
-    let symbols = scan_project_for_symbols(&project.root, &cartographer);
-    project.symbolic_map = symbols.clone();
+    // Use enhanced analysis engine
+    let mut engine = EnhancedAnalysisEngine::new().map_err(|e| e.to_string())?;
+    let analysis_result = engine.analyze_project(&path).await.map_err(|e| e.to_string())?;
+    
+    project.symbolic_map = analysis_result.symbols.clone();
     
     let git_status = if project.repository.is_some() {
         let controller = CodeSourceController::new(&path).map_err(|e| e.to_string())?;
@@ -79,16 +101,19 @@ pub async fn analyze_project(
     
     let config_service = ProjectConfigurationService::new().map_err(|e| e.to_string())?;
     let project_config = config_service
-        .save_project_config(&path, symbols.len(), git_status.clone())
+        .save_project_config(&path, analysis_result.symbols.len(), git_status.clone())
         .map_err(|e| e.to_string())?;
     
     *state.current_project.lock().unwrap() = Some(project);
     
     Ok(AnalysisResult {
-        symbols,
+        symbols: analysis_result.symbols,
         git_status,
         project_path,
         project_config,
+        analysis_time: format!("{:?}", analysis_result.analysis_time),
+        file_count: analysis_result.file_count,
+        cache_hit_rate: 0.0, // TODO: Get from cache manager
     })
 }
 
@@ -265,5 +290,93 @@ pub async fn delete_project_note(
     
     Ok(())
 }
-// Integration: [Imports `Symbol` directly from `secondary-mind-core`, eliminating the redundant local model. The `scan_project_for_symbols` helper now correctly uses the refactored `CodebaseCartographer`.]
-// Notes: [The local `desktop/src/model` directory can now be safely deleted as it is no longer used.]
+
+// Enhanced search command using SearchIndexManager
+#[tauri::command]
+pub async fn search_symbols(
+    request: SearchRequest,
+    state: State<'_, AppState>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let project_guard = state.current_project.lock().unwrap();
+    let project = project_guard.as_ref().ok_or("No project currently loaded")?;
+    
+    let search_manager = SearchIndexManager::new();
+    let results = search_manager
+        .search_symbols(&request.query, request.filters.unwrap_or_default())
+        .map_err(|e| e.to_string())?;
+    
+    let serialized_results: Vec<serde_json::Value> = results
+        .into_iter()
+        .take(request.max_results.unwrap_or(50))
+        .map(|result| serde_json::to_value(result).unwrap_or_default())
+        .collect();
+    
+    Ok(serialized_results)
+}
+
+// Enhanced AI synthesis with context awareness
+#[tauri::command]
+pub async fn enhanced_ai_synthesis(
+    request: AIRequest,
+    state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let project_guard = state.current_project.lock().unwrap();
+    let project = project_guard.as_ref().ok_or("No project currently loaded")?;
+    
+    let ai_core = EnhancedAISynthesisCore::new().map_err(|e| e.to_string())?;
+    let context = request.context.unwrap_or_default();
+    
+    let response = ai_core
+        .synthesize_with_context(&request.query, context)
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    serde_json::to_value(response).map_err(|e| e.to_string())
+}
+
+// Session management commands
+#[tauri::command]
+pub async fn save_session(
+    project_path: String,
+    session_data: serde_json::Value,
+) -> Result<(), String> {
+    let path = PathBuf::from(&project_path);
+    let session_manager = SessionManager::new().map_err(|e| e.to_string())?;
+    
+    let session: ProjectSession = serde_json::from_value(session_data)
+        .map_err(|e| format!("Invalid session data: {}", e))?;
+    
+    session_manager
+        .save_session(&path, &session)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn load_session(project_path: String) -> Result<serde_json::Value, String> {
+    let path = PathBuf::from(&project_path);
+    let session_manager = SessionManager::new().map_err(|e| e.to_string())?;
+    
+    match session_manager.load_session(&path).await {
+        Ok(Some(session)) => serde_json::to_value(session).map_err(|e| e.to_string()),
+        Ok(None) => Ok(serde_json::Value::Null),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+// File watching command
+#[tauri::command]
+pub async fn start_file_watching(
+    project_path: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let path = PathBuf::from(&project_path);
+    let _watcher = FileSystemWatcher::new(&path).map_err(|e| e.to_string())?;
+    
+    // TODO: Store watcher in app state and handle events
+    log::info!("File watching started for project: {}", project_path);
+    Ok(())
+}
+
+// Integration: Enhanced commands that leverage all the new core functionality including search, AI synthesis, and session management.
+// Notes: These commands provide the bridge between the enhanced core capabilities and the frontend UI components.

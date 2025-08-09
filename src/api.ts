@@ -59,6 +59,49 @@ export interface AnalysisResult {
   git_status?: [string, string];
   project_path: string;
   project_config: ProjectConfig;
+  analysis_time: string;
+  file_count: number;
+  cache_hit_rate: number;
+}
+
+export interface SearchRequest {
+  query: string;
+  filters?: SearchFilters;
+  max_results?: number;
+}
+
+export interface SearchFilters {
+  symbol_types: string[];
+  file_patterns: string[];
+  scope: SearchScope;
+  max_results?: number;
+}
+
+export interface SearchScope {
+  type: 'Global' | 'Directory' | 'Files';
+  path?: string;
+  files?: string[];
+}
+
+export interface SearchResult {
+  symbol: Symbol;
+  relevance_score: number;
+  match_type: string;
+  context: any;
+}
+
+export interface AIRequest {
+  query: string;
+  context?: any;
+  response_type: string;
+}
+
+export interface AIResponse {
+  content: string;
+  confidence_score: number;
+  sources: string[];
+  response_type: string;
+  timestamp: string;
 }
 
 export interface GitStatus {
@@ -179,7 +222,7 @@ export const api = {
     } else {
       console.log('🔧 Development mode: Using mock analysis result');
       await new Promise(resolve => setTimeout(resolve, 1500));
-      // UPDATED MOCK with Rust symbols
+      // UPDATED MOCK with Rust symbols and missing properties
       return {
         symbols: [
           {
@@ -206,10 +249,13 @@ export const api = {
         git_status: ['main', 'Up-to-date with origin/main'],
         project_path: projectPath,
         project_config: MOCK_RECENT_PROJECTS.projects[0],
+        // ✨ FIX: Added missing properties with mock values
+        analysis_time: '1.42s',
+        file_count: 178,
+        cache_hit_rate: 0.85,
       };
     }
   },
-
   async removeProjectFromRecent(projectId: string): Promise<void> {
     if (isTauri()) {
       try {
@@ -294,6 +340,169 @@ export const api = {
       }
     } else {
       console.log('🔧 Development mode: Note deletion simulated');
+    }
+  },
+
+  // Session management API functions
+  async createSession(projectId: string, projectPath: string): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('create_session', { projectId, projectPath });
+      } catch (error) {
+        console.error('Failed to create session:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Session creation simulated');
+    }
+  },
+
+  async getSession(projectId: string): Promise<any | null> {
+    if (isTauri()) {
+      try {
+        return await invoke('get_session', { projectId });
+      } catch (error) {
+        console.error('Failed to get session:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock session');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      // Return null to simulate no existing session
+      return null;
+    }
+  },
+
+  async updateSession(session: any): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('update_session', { session });
+      } catch (error) {
+        console.error('Failed to update session:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Session update simulated');
+    }
+  },
+
+  async deleteSession(projectId: string): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('delete_session', { projectId });
+      } catch (error) {
+        console.error('Failed to delete session:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Session deletion simulated');
+    }
+  },
+
+  async listSessions(): Promise<any[]> {
+    if (isTauri()) {
+      try {
+        return await invoke('list_sessions');
+      } catch (error) {
+        console.error('Failed to list sessions:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock session list');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return [];
+    }
+  },
+
+  // Enhanced search functionality
+  async searchSymbols(request: SearchRequest): Promise<SearchResult[]> {
+    if (isTauri()) {
+      try {
+        return await invoke<SearchResult[]>('search_symbols', { request });
+      } catch (error) {
+        console.error('Failed to search symbols:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock search results');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return [
+        {
+          symbol: {
+            identifier: 'UserService',
+            kind: 'TSClass',
+            location: { path: '/src/services/user.ts', line: 15, column: 1 }
+          },
+          relevance_score: 0.95,
+          match_type: 'exact',
+          context: { snippet: 'class UserService {' }
+        }
+      ];
+    }
+  },
+
+  // Enhanced AI synthesis
+  async enhancedAISynthesis(request: AIRequest): Promise<AIResponse> {
+    if (isTauri()) {
+      try {
+        return await invoke<AIResponse>('enhanced_ai_synthesis', { request });
+      } catch (error) {
+        console.error('Failed to get AI synthesis:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock AI response');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      return {
+        content: `Enhanced AI Response: Based on your query "${request.query}", I found relevant patterns with high confidence.`,
+        confidence_score: 0.87,
+        sources: ['/src/services/user.ts', '/src/auth/auth.ts'],
+        response_type: request.response_type,
+        timestamp: new Date().toISOString()
+      };
+    }
+  },
+
+  // Session management
+  async saveSession(projectPath: string, sessionData: any): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('save_session', { projectPath, sessionData });
+      } catch (error) {
+        console.error('Failed to save session:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Session save simulated');
+    }
+  },
+
+  async loadSession(projectPath: string): Promise<any> {
+    if (isTauri()) {
+      try {
+        return await invoke('load_session', { projectPath });
+      } catch (error) {
+        console.error('Failed to load session:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock session');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return null;
+    }
+  },
+
+  // File watching
+  async startFileWatching(projectPath: string): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('start_file_watching', { projectPath });
+      } catch (error) {
+        console.error('Failed to start file watching:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: File watching simulated');
     }
   },
 };

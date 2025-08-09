@@ -30,3 +30,17 @@ chrono = { version = "0.4", features = ["serde"] }
 # New dependency for Rust code parsing
 syn = { version = "2.0", features = ["full", "visit", "extra-traits"] }
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
+
+# Dependencies for enhanced infrastructure
+notify = "6.1"
+lru = "0.12"
+sha2 = "0.10"
+bincode = "1.3"
+
+# Dependencies for error handling and recovery
+async-trait = "0.1"
+rand = "0.8"
+tokio-util = "0.7"
+
+[dev-dependencies]
+tempfile = "3.8"

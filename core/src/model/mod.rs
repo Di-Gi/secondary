@@ -7,3 +7,4 @@ pub mod project;
 pub mod symbol;
 pub mod command;
 pub mod llm; // New model for LLM API data structures
+pub mod session; // Session management models

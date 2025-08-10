@@ -367,7 +367,10 @@ impl SearchIndexManager {
     /// Search using regular expressions
     pub fn search_regex(&self, pattern: &str, filters: &SearchFilters) -> Result<Vec<SearchResult>, SecondaryMindError> {
         let regex = Regex::new(pattern)
-            .map_err(|e| SecondaryMindError::SearchIndexError(format!("Invalid regex pattern: {}", e)))?;
+            .map_err(|e| SecondaryMindError::SearchIndexError {
+                operation: "regex_compile".to_string(),
+                reason: format!("Invalid regex pattern: {}", e)
+            })?;
         
         let mut results = Vec::new();
         

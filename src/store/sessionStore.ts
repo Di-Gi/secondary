@@ -120,9 +120,8 @@ interface SessionState {
   
   // Actions
   initializeSession: (projectId: string, projectPath: string) => Promise<void>;
-  loadSession: (projectId: string) => Promise<void>;
+  loadSession: (projectId: string, projectPath: string) => Promise<void>;
   saveSession: () => Promise<void>;
-  restoreSession: (projectId: string) => Promise<void>;
   deleteSession: (projectId: string) => Promise<void>;
   listSessions: () => Promise<void>;
   
@@ -199,17 +198,22 @@ export const useSessionStore = create<SessionState>()(
         set({ isSessionLoading: true, sessionError: null });
         
         try {
-          // Try to load existing session first
-          const existingSession = await api.getSession(projectId);
+          const existingSession = await api.loadSession(projectPath);
           
           if (existingSession) {
-            // Load existing session
-            await get().loadSession(projectId);
+            // Load existing session data into the store
+            set({
+              currentSession: existingSession,
+              openFiles: existingSession.open_files || [],
+              bookmarks: existingSession.bookmarks || [],
+              searchHistory: existingSession.search_history || [],
+              chatHistory: existingSession.ai_chat_history || [],
+              workspaceLayout: existingSession.workspace_layout || defaultWorkspaceLayout,
+              isSessionLoading: false,
+              hasUnsavedChanges: false,
+            });
           } else {
-            // Create new session
-            await api.createSession(projectId, projectPath);
-            
-            // Initialize with default state
+            // Create a new session if one doesn't exist
             const newSession: ProjectSession = {
               project_id: projectId,
               project_path: projectPath,
@@ -222,6 +226,8 @@ export const useSessionStore = create<SessionState>()(
               created_at: new Date().toISOString(),
             };
             
+            await api.saveSession(projectPath, newSession);
+            
             set({
               currentSession: newSession,
               openFiles: [],
@@ -233,41 +239,41 @@ export const useSessionStore = create<SessionState>()(
               hasUnsavedChanges: false,
             });
           }
-          
-          // Refresh available sessions
-          await get().listSessions();
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           set({
-            sessionError: `Failed to initialize session: ${error}`,
+            sessionError: `Failed to initialize session: ${errorMessage}`,
             isSessionLoading: false,
           });
         }
       },
 
       // Load an existing session
-      loadSession: async (projectId: string) => {
+      loadSession: async (projectId: string, projectPath: string) => {
         set({ isSessionLoading: true, sessionError: null });
         
         try {
-          const session = await api.getSession(projectId);
+          const session = await api.loadSession(projectPath);
           
           if (session) {
             set({
               currentSession: session,
-              openFiles: session.open_files,
-              bookmarks: session.bookmarks,
-              searchHistory: session.search_history,
-              chatHistory: session.ai_chat_history,
-              workspaceLayout: session.workspace_layout,
+              openFiles: session.open_files || [],
+              bookmarks: session.bookmarks || [],
+              searchHistory: session.search_history || [],
+              chatHistory: session.ai_chat_history || [],
+              workspaceLayout: session.workspace_layout || defaultWorkspaceLayout,
               isSessionLoading: false,
               hasUnsavedChanges: false,
             });
           } else {
-            throw new Error('Session not found');
+            // If no session, initialize a new one
+            await get().initializeSession(projectId, projectPath);
           }
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           set({
-            sessionError: `Failed to load session: ${error}`,
+            sessionError: `Failed to load session: ${errorMessage}`,
             isSessionLoading: false,
           });
         }
@@ -291,7 +297,7 @@ export const useSessionStore = create<SessionState>()(
             last_updated: new Date().toISOString(),
           };
 
-          await api.updateSession(updatedSession);
+          await api.saveSession(state.currentSession.project_path, updatedSession);
           
           set({
             currentSession: updatedSession,
@@ -300,18 +306,9 @@ export const useSessionStore = create<SessionState>()(
             sessionError: null,
           });
         } catch (error) {
-          set({
-            sessionError: `Failed to save session: ${error}`,
-          });
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          set({ sessionError: `Failed to save session: ${errorMessage}` });
         }
-      },
-
-      // Restore a session (load and mark as active)
-      restoreSession: async (projectId: string) => {
-        await get().loadSession(projectId);
-        
-        // Additional restoration logic could go here
-        // (e.g., reopening files, restoring scroll positions)
       },
 
       // Delete a session
@@ -319,18 +316,14 @@ export const useSessionStore = create<SessionState>()(
         try {
           await api.deleteSession(projectId);
           
-          // If we're deleting the current session, reset state
           const state = get();
           if (state.currentSession?.project_id === projectId) {
             get().resetSession();
           }
-          
-          // Refresh available sessions
           await get().listSessions();
         } catch (error) {
-          set({
-            sessionError: `Failed to delete session: ${error}`,
-          });
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          set({ sessionError: `Failed to delete session: ${errorMessage}` });
         }
       },
 
@@ -343,6 +336,8 @@ export const useSessionStore = create<SessionState>()(
           console.error('Failed to list sessions:', error);
         }
       },
+
+      // Other actions remain the same...
 
       // File management actions
       openFile: (filePath: string, position?: Position) => {
@@ -359,223 +354,145 @@ export const useSessionStore = create<SessionState>()(
 
         let updatedFiles: OpenFile[];
         if (existingFileIndex >= 0) {
-          // Update existing file
           updatedFiles = state.openFiles.map((file, index) => 
             index === existingFileIndex 
               ? { ...newFile, scroll_position: file.scroll_position }
               : { ...file, is_active: false }
           );
         } else {
-          // Add new file and deactivate others
           updatedFiles = [
             ...state.openFiles.map(f => ({ ...f, is_active: false })),
             newFile
           ];
         }
 
-        set({ 
-          openFiles: updatedFiles,
-          hasUnsavedChanges: true,
-        });
+        set({ openFiles: updatedFiles, hasUnsavedChanges: true });
       },
 
       closeFile: (filePath: string) => {
         const state = get();
         const updatedFiles = state.openFiles.filter(f => f.path !== filePath);
         
-        // If we closed the active file, make the last file active
         if (updatedFiles.length > 0 && !updatedFiles.some(f => f.is_active)) {
           updatedFiles[updatedFiles.length - 1].is_active = true;
         }
 
-        set({ 
-          openFiles: updatedFiles,
-          hasUnsavedChanges: true,
-        });
+        set({ openFiles: updatedFiles, hasUnsavedChanges: true });
       },
 
       updateFilePosition: (filePath: string, position: Position, scrollPosition?: number) => {
-        const state = get();
-        const updatedFiles = state.openFiles.map(file =>
-          file.path === filePath
-            ? {
-                ...file,
-                cursor_position: position,
-                scroll_position: scrollPosition ?? file.scroll_position,
-                last_accessed: new Date().toISOString(),
-              }
-            : file
-        );
-
-        set({ 
-          openFiles: updatedFiles,
-          hasUnsavedChanges: true,
-        });
+        set(state => ({ 
+          openFiles: state.openFiles.map(file =>
+            file.path === filePath
+              ? {
+                  ...file,
+                  cursor_position: position,
+                  scroll_position: scrollPosition ?? file.scroll_position,
+                  last_accessed: new Date().toISOString(),
+                }
+              : file
+          ),
+          hasUnsavedChanges: true 
+        }));
       },
 
       setActiveFile: (filePath: string) => {
-        const state = get();
-        const updatedFiles = state.openFiles.map(file => ({
-          ...file,
-          is_active: file.path === filePath,
-          last_accessed: file.path === filePath ? new Date().toISOString() : file.last_accessed,
+        set(state => ({
+          openFiles: state.openFiles.map(file => ({
+            ...file,
+            is_active: file.path === filePath,
+            last_accessed: file.path === filePath ? new Date().toISOString() : file.last_accessed,
+          })),
+          hasUnsavedChanges: true
         }));
-
-        set({ 
-          openFiles: updatedFiles,
-          hasUnsavedChanges: true,
-        });
       },
 
       updateFileSelection: (filePath: string, selection?: Range) => {
-        const state = get();
-        const updatedFiles = state.openFiles.map(file =>
-          file.path === filePath
-            ? { ...file, selection }
-            : file
-        );
-
-        set({ 
-          openFiles: updatedFiles,
-          hasUnsavedChanges: true,
-        });
+        set(state => ({
+          openFiles: state.openFiles.map(file =>
+            file.path === filePath ? { ...file, selection } : file
+          ),
+          hasUnsavedChanges: true
+        }));
       },
 
-      // Bookmark management
       addBookmark: (bookmark: Omit<Bookmark, 'id' | 'created_at'>) => {
         const newBookmark: Bookmark = {
           ...bookmark,
           id: `bookmark_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           created_at: new Date().toISOString(),
         };
-
-        set(state => ({ 
-          bookmarks: [...state.bookmarks, newBookmark],
-          hasUnsavedChanges: true,
-        }));
+        set(state => ({ bookmarks: [...state.bookmarks, newBookmark], hasUnsavedChanges: true }));
       },
 
       removeBookmark: (bookmarkId: string) => {
-        set(state => ({ 
-          bookmarks: state.bookmarks.filter(b => b.id !== bookmarkId),
-          hasUnsavedChanges: true,
-        }));
+        set(state => ({ bookmarks: state.bookmarks.filter(b => b.id !== bookmarkId), hasUnsavedChanges: true }));
       },
 
       updateBookmark: (bookmarkId: string, updates: Partial<Bookmark>) => {
         set(state => ({
-          bookmarks: state.bookmarks.map(bookmark =>
-            bookmark.id === bookmarkId 
-              ? { ...bookmark, ...updates }
-              : bookmark
-          ),
-          hasUnsavedChanges: true,
+          bookmarks: state.bookmarks.map(b => b.id === bookmarkId ? { ...b, ...updates } : b),
+          hasUnsavedChanges: true
         }));
       },
 
-      // Search history
       addSearchQuery: (query: string) => {
-        set(state => {
-          const filteredHistory = state.searchHistory.filter(q => q !== query);
-          return {
-            searchHistory: [query, ...filteredHistory].slice(0, 50), // Keep last 50
-            hasUnsavedChanges: true,
-          };
-        });
+        set(state => ({
+          searchHistory: [query, ...state.searchHistory.filter(q => q !== query)].slice(0, 50),
+          hasUnsavedChanges: true
+        }));
       },
 
       clearSearchHistory: () => {
-        set({ 
-          searchHistory: [],
-          hasUnsavedChanges: true,
-        });
+        set({ searchHistory: [], hasUnsavedChanges: true });
       },
 
-      // Chat history
       addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
         const newMessage: ChatMessage = {
           ...message,
           id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           timestamp: new Date().toISOString(),
         };
-
-        set(state => ({ 
-          chatHistory: [...state.chatHistory, newMessage].slice(-1000), // Keep last 1000
-          hasUnsavedChanges: true,
+        set(state => ({
+          chatHistory: [...state.chatHistory, newMessage].slice(-1000),
+          hasUnsavedChanges: true
         }));
       },
 
       clearChatHistory: () => {
-        set({ 
-          chatHistory: [],
-          hasUnsavedChanges: true,
-        });
+        set({ chatHistory: [], hasUnsavedChanges: true });
       },
 
-      // Layout management
       updatePanelState: (panelId: string, state: Partial<PanelState>) => {
         set(currentState => ({
-          workspaceLayout: {
-            ...currentState.workspaceLayout,
-            panels: {
-              ...currentState.workspaceLayout.panels,
-              [panelId]: {
-                ...currentState.workspaceLayout.panels[panelId],
-                ...state,
-              },
-            },
-          },
-          hasUnsavedChanges: true,
+          workspaceLayout: { ...currentState.workspaceLayout, panels: { ...currentState.workspaceLayout.panels, [panelId]: { ...currentState.workspaceLayout.panels[panelId], ...state } } },
+          hasUnsavedChanges: true
         }));
       },
 
       updateSplitterState: (splitterId: string, state: Partial<SplitterState>) => {
         set(currentState => ({
-          workspaceLayout: {
-            ...currentState.workspaceLayout,
-            splitters: {
-              ...currentState.workspaceLayout.splitters,
-              [splitterId]: {
-                ...currentState.workspaceLayout.splitters[splitterId],
-                ...state,
-              },
-            },
-          },
-          hasUnsavedChanges: true,
+          workspaceLayout: { ...currentState.workspaceLayout, splitters: { ...currentState.workspaceLayout.splitters, [splitterId]: { ...currentState.workspaceLayout.splitters[splitterId], ...state } } },
+          hasUnsavedChanges: true
         }));
       },
 
       updateWindowSize: (size: WindowSize) => {
         set(state => ({
-          workspaceLayout: {
-            ...state.workspaceLayout,
-            window_size: size,
-          },
-          hasUnsavedChanges: true,
+          workspaceLayout: { ...state.workspaceLayout, window_size: size },
+          hasUnsavedChanges: true
         }));
       },
 
       setActiveTab: (panelId: string, tabId: string) => {
         set(state => ({
-          workspaceLayout: {
-            ...state.workspaceLayout,
-            active_tabs: {
-              ...state.workspaceLayout.active_tabs,
-              [panelId]: tabId,
-            },
-          },
-          hasUnsavedChanges: true,
+          workspaceLayout: { ...state.workspaceLayout, active_tabs: { ...state.workspaceLayout.active_tabs, [panelId]: tabId } },
+          hasUnsavedChanges: true
         }));
       },
 
-      // Utility actions
-      markUnsavedChanges: () => {
-        set({ hasUnsavedChanges: true });
-      },
-
-      clearUnsavedChanges: () => {
-        set({ hasUnsavedChanges: false });
-      },
+      markUnsavedChanges: () => set({ hasUnsavedChanges: true }),
+      clearUnsavedChanges: () => set({ hasUnsavedChanges: false }),
 
       resetSession: () => {
         set({
@@ -594,10 +511,9 @@ export const useSessionStore = create<SessionState>()(
     {
       name: 'session-storage',
       storage: createJSONStorage(() => localStorage),
-      // Only persist essential UI state, not the full session data
       partialize: (state) => ({
         workspaceLayout: state.workspaceLayout,
-        searchHistory: state.searchHistory.slice(0, 10), // Only recent searches
+        searchHistory: state.searchHistory.slice(0, 10),
       }),
     }
   )
@@ -609,27 +525,22 @@ export const useAutoSave = () => {
   const hasUnsavedChanges = useSessionStore(state => state.hasUnsavedChanges);
   const currentSession = useSessionStore(state => state.currentSession);
 
-  // Auto-save every 30 seconds if there are unsaved changes
   React.useEffect(() => {
     if (!currentSession || !hasUnsavedChanges) {
       return;
     }
-
     const interval = setInterval(() => {
       saveSession();
-    }, 30000); // 30 seconds
-
+    }, 30000);
     return () => clearInterval(interval);
   }, [saveSession, hasUnsavedChanges, currentSession]);
 
-  // Save on window beforeunload
   React.useEffect(() => {
     const handleBeforeUnload = () => {
       if (hasUnsavedChanges && currentSession) {
         saveSession();
       }
     };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveSession, hasUnsavedChanges, currentSession]);

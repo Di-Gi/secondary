@@ -87,7 +87,7 @@ impl CacheManager {
             fs::create_dir_all(&config.cache_directory)
                 .map_err(|e| SecondaryMindError::IoError { 
                     path: config.cache_directory.clone(), 
-                    source: e 
+                    message: e.to_string() 
                 })?;
         }
 
@@ -289,12 +289,12 @@ impl CacheManager {
                 fs::remove_dir_all(&self.config.cache_directory)
                     .map_err(|e| SecondaryMindError::IoError { 
                         path: self.config.cache_directory.clone(), 
-                        source: e 
+                        message: e.to_string() 
                     })?;
                 fs::create_dir_all(&self.config.cache_directory)
                     .map_err(|e| SecondaryMindError::IoError { 
                         path: self.config.cache_directory.clone(), 
-                        source: e 
+                        message: e.to_string() 
                     })?;
             }
         }
@@ -337,7 +337,7 @@ impl CacheManager {
             fs::create_dir_all(parent)
                 .map_err(|e| SecondaryMindError::IoError { 
                     path: parent.to_path_buf(), 
-                    source: e 
+                    message: e.to_string() 
                 })?;
         }
         
@@ -347,7 +347,7 @@ impl CacheManager {
         fs::write(&cache_file, serialized)
             .map_err(|e| SecondaryMindError::IoError { 
                 path: cache_file, 
-                source: e 
+                message: e.to_string() 
             })?;
         
         Ok(())
@@ -361,7 +361,7 @@ impl CacheManager {
             fs::create_dir_all(parent)
                 .map_err(|e| SecondaryMindError::IoError { 
                     path: parent.to_path_buf(), 
-                    source: e 
+                    message: e.to_string() 
                 })?;
         }
         
@@ -371,7 +371,7 @@ impl CacheManager {
         fs::write(&cache_file, serialized)
             .map_err(|e| SecondaryMindError::IoError { 
                 path: cache_file, 
-                source: e 
+                message: e.to_string() 
             })?;
         
         Ok(())
@@ -384,11 +384,11 @@ impl CacheManager {
             for entry in fs::read_dir(&files_dir)
                 .map_err(|e| SecondaryMindError::IoError { 
                     path: files_dir.clone(), 
-                    source: e 
+                    message: e.to_string() 
                 })? {
                 let entry = entry.map_err(|e| SecondaryMindError::IoError { 
                     path: files_dir.clone(), 
-                    source: e 
+                    message: e.to_string() 
                 })?;
                 
                 if let Some(file_name) = entry.file_name().to_str() {
@@ -411,11 +411,11 @@ impl CacheManager {
             for entry in fs::read_dir(&projects_dir)
                 .map_err(|e| SecondaryMindError::IoError { 
                     path: projects_dir.clone(), 
-                    source: e 
+                    message: e.to_string() 
                 })? {
                 let entry = entry.map_err(|e| SecondaryMindError::IoError { 
                     path: projects_dir.clone(), 
-                    source: e 
+                    message: e.to_string() 
                 })?;
                 
                 if let Some(file_name) = entry.file_name().to_str() {

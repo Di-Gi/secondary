@@ -402,7 +402,8 @@ impl ErrorRecoveryManager {
 
         // Keep only recent history (last 100 attempts)
         if history.len() > 100 {
-            history.drain(0..history.len() - 100);
+            let excess = history.len() - 100;
+            history.drain(0..excess);
         }
     }
 

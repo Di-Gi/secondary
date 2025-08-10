@@ -21,7 +21,7 @@ impl Project {
     /// Creates a new Project instance.
     pub fn new(path: &Path) -> Result<Self, crate::errors::SecondaryMindError> {
         let absolute_path = path.canonicalize().map_err(|e| {
-            crate::errors::SecondaryMindError::IoError { path: path.to_path_buf(), source: e }
+            crate::errors::SecondaryMindError::from_io_error(path.to_path_buf(), e)
         })?;
         let repository = Repository::open(&absolute_path).ok();
 

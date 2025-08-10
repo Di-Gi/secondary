@@ -25,7 +25,7 @@ impl HomeDirectoryManager {
             fs::create_dir_all(&secondary_dir).map_err(|e| {
                 SecondaryMindError::IoError {
                     path: secondary_dir.clone(),
-                    source: e,
+                    message: e.to_string(),
                 }
             })?;
             log::info!("Created .secondary directory at: {}", secondary_dir.display());
@@ -39,7 +39,7 @@ impl HomeDirectoryManager {
                 fs::create_dir_all(&path).map_err(|e| {
                     SecondaryMindError::IoError {
                         path: path.clone(),
-                        source: e,
+                        message: e.to_string(),
                     }
                 })?;
                 log::debug!("Created subdirectory: {}", path.display());
@@ -106,7 +106,7 @@ impl HomeDirectoryManager {
             fs::create_dir_all(&project_dir).map_err(|e| {
                 SecondaryMindError::IoError {
                     path: project_dir.clone(),
-                    source: e,
+                    message: e.to_string(),
                 }
             })?;
         }
@@ -116,7 +116,7 @@ impl HomeDirectoryManager {
             fs::create_dir_all(&notes_dir).map_err(|e| {
                 SecondaryMindError::IoError {
                     path: notes_dir.clone(),
-                    source: e,
+                    message: e.to_string(),
                 }
             })?;
         }

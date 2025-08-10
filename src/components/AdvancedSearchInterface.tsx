@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Symbol } from '../api';
+import { Symbol, SearchRequest, SearchResult as APISearchResult, SearchScope } from '../api';
+import { useAppStore } from '../store/appStore';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -51,14 +52,15 @@ export function AdvancedSearchInterface({
   onSymbolSelect,
   currentFilePath
 }: AdvancedSearchInterfaceProps) {
+  const { searchSymbols, searchResults, isSearching: storeIsSearching, searchHistory: storeSearchHistory } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState<'text' | 'symbol' | 'semantic' | 'regex'>('symbol');
   const [showFilters, setShowFilters] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>(storeSearchHistory);
   
   const [filters, setFilters] = useState<SearchFilters>({
     symbolTypes: [],
@@ -77,6 +79,52 @@ export function AdvancedSearchInterface({
     return Array.from(types).sort();
   }, [symbols]);
 
+  // Enhanced search handler
+  const handleEnhancedSearch = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+
+    const searchScope: SearchScope = (() => {
+      switch (filters.searchScope) {
+        case 'current-file':
+          return currentFilePath ? { type: 'Files', files: [currentFilePath] } : { type: 'Global' };
+        case 'current-project':
+          return { type: 'Global' };
+        default:
+          return { type: 'Global' };
+      }
+    })();
+
+    const searchRequest: SearchRequest = {
+      query,
+      filters: {
+        symbol_types: filters.symbolTypes,
+        file_patterns: filters.filePatterns,
+        scope: searchScope,
+        max_results: 50
+      },
+      max_results: 50
+    };
+
+    try {
+      const results = await searchSymbols(searchRequest);
+      
+      // Convert API results to component format
+      const componentResults: SearchResult[] = results.map(result => ({
+        symbol: result.symbol,
+        matchType: result.match_type as any,
+        relevanceScore: result.relevance_score,
+        context: {
+          fileContext: result.symbol.location.path,
+          relatedSymbols: []
+        }
+      }));
+
+      onSearchResults?.(componentResults);
+    } catch (error) {
+      console.error('Enhanced search failed:', error);
+    }
+  }, [searchSymbols, filters, currentFilePath, onSearchResults]);
+
   // Generate search suggestions based on current query
   const generateSuggestions = useCallback((query: string) => {
     if (!query || query.length < 2) {
@@ -90,13 +138,13 @@ export function AdvancedSearchInterface({
       .map(s => s.identifier)
       .slice(0, 5);
 
-    const historySuggestions = searchHistory
+    const historySuggestions = storeSearchHistory
       .filter(h => h.toLowerCase().includes(queryLower))
       .slice(0, 3);
 
     const allSuggestions = [...new Set([...symbolSuggestions, ...historySuggestions])];
     setSuggestions(allSuggestions.slice(0, 8));
-  }, [symbols, searchHistory]);
+  }, [symbols, storeSearchHistory]);
 
   // Debounced suggestion generation
   useEffect(() => {

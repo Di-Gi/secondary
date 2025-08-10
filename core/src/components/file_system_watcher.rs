@@ -97,7 +97,11 @@ impl FileSystemWatcher {
                     log::error!("File watcher error: {:?}", e);
                 }
             }
-        }).map_err(|e| SecondaryMindError::FileWatcherError(format!("Failed to create watcher: {}", e)))?;
+        }).map_err(|e| SecondaryMindError::FileWatcherError {
+            event_type: "create_watcher".to_string(),
+            path: PathBuf::from("."),
+            reason: format!("Failed to create watcher: {}", e)
+        })?;
 
         // Start cleanup task for debounced events
         let cleanup_events = debounced_events.clone();
@@ -133,9 +137,11 @@ impl FileSystemWatcher {
         
         self.watcher
             .watch(project_path, RecursiveMode::Recursive)
-            .map_err(|e| SecondaryMindError::FileWatcherError(
-                format!("Failed to watch path {}: {}", project_path.display(), e)
-            ))?;
+            .map_err(|e| SecondaryMindError::FileWatcherError {
+                event_type: "watch".to_string(),
+                path: project_path.to_path_buf(),
+                reason: format!("Failed to watch path {}: {}", project_path.display(), e)
+            })?;
 
         self.watched_paths.insert(project_path.to_path_buf());
         Ok(())
@@ -151,9 +157,11 @@ impl FileSystemWatcher {
         
         self.watcher
             .unwatch(project_path)
-            .map_err(|e| SecondaryMindError::FileWatcherError(
-                format!("Failed to unwatch path {}: {}", project_path.display(), e)
-            ))?;
+            .map_err(|e| SecondaryMindError::FileWatcherError {
+                event_type: "unwatch".to_string(),
+                path: project_path.to_path_buf(),
+                reason: format!("Failed to unwatch path {}: {}", project_path.display(), e)
+            })?;
 
         self.watched_paths.remove(project_path);
         Ok(())

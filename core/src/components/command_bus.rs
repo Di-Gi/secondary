@@ -54,7 +54,7 @@ impl CommandBus {
         
         for file_path in relevant_files {
             let content = fs::read_to_string(&file_path).await.map_err(|e| {
-                SecondaryMindError::IoError { path: file_path.clone(), source: e }
+                SecondaryMindError::from_io_error(file_path.clone(), e)
             })?;
             context.push_str(&format!("// File: {}\n{}\n\n", file_path.display(), content));
         }

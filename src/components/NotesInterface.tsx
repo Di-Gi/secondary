@@ -3,27 +3,21 @@
 // Architecture: Updated to use the persistent storage system for automatic note saving and loading per project.
 // Dependencies: Enhanced app store with note persistence, existing UI components, improved state management.
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import { ProjectNote } from '../api';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Separator } from './ui/separator';
+// import { Separator } from './ui/separator';
 import { LoadingSpinner } from './ui/loading-spinner';
 import { 
   Search, 
   Plus, 
   FileText, 
-  Hash, 
-  Calendar, 
   Clock, 
   Star, 
-  Archive, 
-  MoreHorizontal,
-  Save,
   Trash2,
   FolderOpen,
   Loader2
@@ -62,7 +56,7 @@ export function NotesInterface() {
   // Refs
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const saveTimeoutRef = useRef<number>();
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Load notes when project changes
   useEffect(() => {
@@ -76,7 +70,11 @@ export function NotesInterface() {
   // Auto-select first note when notes load
   useEffect(() => {
     if (projectNotes.length > 0 && !selectedNoteId) {
-      setSelectedNoteId(projectNotes[0].id);
+      // Find the most recently modified note to select by default
+      const mostRecentNote = [...projectNotes].sort((a, b) => 
+        new Date(b.last_modified).getTime() - new Date(a.last_modified).getTime()
+      )[0];
+      setSelectedNoteId(mostRecentNote.id);
     }
   }, [projectNotes, selectedNoteId]);
 
@@ -86,10 +84,11 @@ export function NotesInterface() {
 
     // Apply search filter
     if (searchTerm) {
+      const lowercasedTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(note => 
-        note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        note.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+        note.title.toLowerCase().includes(lowercasedTerm) ||
+        note.content.toLowerCase().includes(lowercasedTerm) ||
+        note.tags.some(tag => tag.toLowerCase().includes(lowercasedTerm))
       );
     }
 
@@ -99,15 +98,11 @@ export function NotesInterface() {
         filtered = filtered.filter(note => note.is_favorited);
         break;
       case 'recent':
-        filtered = filtered.slice().sort((a, b) => 
-          new Date(b.last_modified).getTime() - new Date(a.last_modified).getTime()
-        ).slice(0, 10);
-        break;
-      default:
+        // The main list is already sorted by last_modified, so we just slice
         break;
     }
 
-    // Sort by last modified (most recent first)
+    // Sort by last modified (most recent first) for all views
     return filtered.sort((a, b) => 
       new Date(b.last_modified).getTime() - new Date(a.last_modified).getTime()
     );
@@ -119,26 +114,24 @@ export function NotesInterface() {
   );
 
   // Auto-save functionality
-  const autoSave = useMemo(() => {
-    return (note: ProjectNote) => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+  const autoSave = useCallback((note: ProjectNote) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    setHasUnsavedChanges(true);
+    
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        setIsSaving(true);
+        await saveNote(note);
+        setHasUnsavedChanges(false);
+      } catch (error) {
+        console.error('Failed to auto-save note:', error);
+      } finally {
+        setIsSaving(false);
       }
-      
-      setHasUnsavedChanges(true);
-      
-      saveTimeoutRef.current = setTimeout(async () => {
-        try {
-          setIsSaving(true);
-          await saveNote(note);
-          setHasUnsavedChanges(false);
-        } catch (error) {
-          console.error('Failed to auto-save note:', error);
-        } finally {
-          setIsSaving(false);
-        }
-      }, 1000); // Save after 1 second of inactivity
-    };
+    }, 1500); // Save after 1.5 seconds of inactivity
   }, [saveNote]);
 
   // Handlers
@@ -148,6 +141,7 @@ export function NotesInterface() {
       const newNote = createNewNote();
       await saveNote(newNote);
       setSelectedNoteId(newNote.id);
+      // Wait for the re-render so titleRef is attached to the new note's input
       setTimeout(() => titleRef.current?.select(), 100);
     } catch (error) {
       console.error('Failed to create note:', error);
@@ -159,8 +153,8 @@ export function NotesInterface() {
   const handleUpdateNote = (field: keyof ProjectNote, value: any) => {
     if (!selectedNote) return;
     
-    const updatedNote = { ...selectedNote, [field]: value };
-    updateNote(selectedNote.id, { [field]: value });
+    const updatedNote = { ...selectedNote, [field]: value, last_modified: new Date().toISOString() };
+    updateNote(selectedNote.id, { [field]: value, last_modified: updatedNote.last_modified });
     autoSave(updatedNote);
   };
 
@@ -177,12 +171,13 @@ export function NotesInterface() {
   };
 
   const handleDeleteNote = async (noteId: string) => {
-    if (!confirm('Are you sure you want to delete this note?')) return;
+    // A simple confirmation dialog
+    if (!confirm('Are you sure you want to delete this note? This action cannot be undone.')) return;
     
     try {
       await deleteNote(noteId);
       if (selectedNoteId === noteId) {
-        setSelectedNoteId(null);
+        setSelectedNoteId(null); // Deselect if the current note is deleted
       }
     } catch (error) {
       console.error('Failed to delete note:', error);
@@ -204,11 +199,11 @@ export function NotesInterface() {
 
   if (!currentProject) {
     return (
-      <div className="flex h-full items-center justify-center text-gray-500">
+      <div className="flex h-full items-center justify-center text-gray-500 bg-gray-50">
         <div className="text-center">
           <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <h3 className="font-medium mb-2">No Project Selected</h3>
-          <p className="text-sm">Select a project to access its notes</p>
+          <h3 className="font-semibold text-lg mb-2">No Project Loaded</h3>
+          <p className="text-sm text-gray-600">Please open a project to view or create notes.</p>
         </div>
       </div>
     );
@@ -223,17 +218,19 @@ export function NotesInterface() {
   }
 
   return (
-    <div className="flex h-full bg-gray-50">
+    <div className="flex h-full bg-gray-50 dark:bg-gray-900">
       {/* Sidebar - Navigation */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900">Notes</h2>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Notes</h2>
             <Button 
-              size="sm" 
+              size="icon" 
+              variant="ghost"
               onClick={handleCreateNote}
               disabled={isCreatingNote}
+              aria-label="Create new note"
             >
               {isCreatingNote ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -256,132 +253,103 @@ export function NotesInterface() {
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-2">
-            <div className="space-y-1 mb-4">
-              <button
-                onClick={() => setActiveView('all')}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
-                  activeView === 'all' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
-                )}
-              >
-                <FileText className="h-4 w-4" />
-                All Notes
-                <Badge variant="secondary" className="ml-auto">
-                  {projectNotes.length}
-                </Badge>
-              </button>
-              
-              <button
-                onClick={() => setActiveView('favorites')}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
-                  activeView === 'favorites' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
-                )}
-              >
-                <Star className="h-4 w-4" />
-                Favorites
-                <Badge variant="secondary" className="ml-auto">
-                  {projectNotes.filter(n => n.is_favorited).length}
-                </Badge>
-              </button>
-              
-              <button
-                onClick={() => setActiveView('recent')}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
-                  activeView === 'recent' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
-                )}
-              >
-                <Clock className="h-4 w-4" />
-                Recent
-              </button>
-            </div>
-
-            <Separator className="my-4" />
-
-            {/* Project Info */}
-            <div className="px-3 py-2">
-              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                Current Project
-              </h3>
-              <div className="text-sm">
-                <div className="font-medium text-gray-900 truncate" title={currentProject.project_config.name}>
-                  {currentProject.project_config.name}
-                </div>
-                <div className="text-gray-500 text-xs mt-1">
-                  {projectNotes.length} notes
-                </div>
-              </div>
-            </div>
+        <nav className="flex-1 overflow-y-auto p-2">
+          <div className="space-y-1">
+            <button
+              onClick={() => setActiveView('all')}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
+                activeView === 'all' 
+                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200' 
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              )}
+            >
+              <FileText className="h-4 w-4" />
+              All Notes
+              <Badge variant="secondary" className="ml-auto">
+                {projectNotes.length}
+              </Badge>
+            </button>
+            
+            <button
+              onClick={() => setActiveView('favorites')}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
+                activeView === 'favorites' 
+                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200' 
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              )}
+            >
+              <Star className="h-4 w-4" />
+              Favorites
+              <Badge variant="secondary" className="ml-auto">
+                {projectNotes.filter(n => n.is_favorited).length}
+              </Badge>
+            </button>
+            
+            <button
+              onClick={() => setActiveView('recent')}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors',
+                activeView === 'recent' 
+                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200' 
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              )}
+            >
+              <Clock className="h-4 w-4" />
+              Recent
+            </button>
           </div>
-        </div>
+        </nav>
       </aside>
 
       {/* Note List */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium text-gray-900">
-              {activeView === 'all' && 'All Notes'}
-              {activeView === 'favorites' && 'Favorites'}
-              {activeView === 'recent' && 'Recent Notes'}
-            </h3>
-            <Button 
-              size="sm" 
-              variant="ghost"
-              onClick={handleCreateNote}
-              disabled={isCreatingNote}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Note List */}
+      <div className="w-80 bg-gray-100/50 dark:bg-gray-800/50 border-r border-gray-200 dark:border-gray-700 flex flex-col">
         <div className="flex-1 overflow-y-auto">
           {filteredNotes.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
-              <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No notes found</p>
-              {searchTerm && (
-                <p className="text-xs mt-1">Try adjusting your search</p>
-              )}
+            <div className="p-4 text-center text-gray-500 mt-10">
+              <FileText className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p className="text-sm font-medium">No notes found</p>
+              {searchTerm && <p className="text-xs mt-1">Try adjusting your search.</p>}
             </div>
           ) : (
             <div className="space-y-1 p-2">
               {filteredNotes.map(note => (
-                <button
+                <div
                   key={note.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedNoteId(note.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedNoteId(note.id);
+                    }
+                  }}
                   className={cn(
-                    'w-full text-left p-3 rounded-lg transition-colors group',
+                    'w-full text-left p-3 rounded-lg transition-colors group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500',
                     selectedNoteId === note.id 
-                      ? 'bg-blue-50 border border-blue-200' 
-                      : 'hover:bg-gray-50 border border-transparent'
+                      ? 'bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700' 
+                      : 'hover:bg-white/50 dark:hover:bg-gray-700/50 border border-transparent'
                   )}
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium text-sm text-gray-900 truncate pr-2">
-                      {note.title}
+                    <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate pr-2">
+                      {note.title || "Untitled Note"}
                     </h4>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      {note.is_favorited && (
-                        <Star className="h-3 w-3 text-yellow-500 fill-current" />
-                      )}
-                      <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                      <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex gap-1 transition-opacity">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleToggleFavorite(note.id);
                           }}
-                          className="hover:bg-gray-200 p-1 rounded"
+                          aria-label="Toggle favorite"
+                          className="hover:bg-gray-200 dark:hover:bg-gray-600 p-1 rounded"
                         >
                           <Star className={cn(
-                            "h-3 w-3",
-                            note.is_favorited ? "text-yellow-500 fill-current" : "text-gray-400"
+                            "h-4 w-4",
+                            note.is_favorited ? "text-yellow-500 fill-current" : "text-gray-400 dark:text-gray-500"
                           )} />
                         </button>
                         <button
@@ -389,39 +357,26 @@ export function NotesInterface() {
                             e.stopPropagation();
                             handleDeleteNote(note.id);
                           }}
-                          className="hover:bg-gray-200 p-1 rounded"
+                          aria-label="Delete note"
+                          className="hover:bg-gray-200 dark:hover:bg-gray-600 p-1 rounded"
                         >
-                          <Trash2 className="h-3 w-3 text-red-500" />
+                          <Trash2 className="h-4 w-4 text-red-500" />
                         </button>
                       </div>
                     </div>
                   </div>
                   
-                  <p className="text-xs text-gray-600 line-clamp-2 mb-2">
-                    {note.content || 'No content'}
+                  <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">
+                    {note.content || 'No additional content'}
                   </p>
                   
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">
-                      {formatDate(note.last_modified)}
-                    </span>
-                    
-                    {note.tags.length > 0 && (
-                      <div className="flex gap-1">
-                        {note.tags.slice(0, 2).map(tag => (
-                          <Badge key={tag} variant="secondary" className="text-xs px-1 py-0">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {note.tags.length > 2 && (
-                          <Badge variant="secondary" className="text-xs px-1 py-0">
-                            +{note.tags.length - 2}
-                          </Badge>
-                        )}
-                      </div>
+                  <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+                    <span>{formatDate(note.last_modified)}</span>
+                    {note.is_favorited && (
+                      <Star className="h-3 w-3 text-yellow-500 fill-current" />
                     )}
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -429,70 +384,58 @@ export function NotesInterface() {
       </div>
 
       {/* Editor */}
-      <div className="flex-1 flex flex-col bg-white">
+      <main className="flex-1 flex flex-col bg-white dark:bg-gray-900">
         {selectedNote ? (
           <>
-            {/* Editor Header */}
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-3">
                 <Input
                   ref={titleRef}
                   value={selectedNote.title}
                   onChange={(e) => handleUpdateNote('title', e.target.value)}
-                  className="text-lg font-semibold border-none shadow-none p-0 h-auto focus-visible:ring-0"
-                  placeholder="Note title..."
+                  className="text-lg font-semibold border-none shadow-none p-0 h-auto focus-visible:ring-0 bg-transparent"
+                  placeholder="Note Title"
                 />
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {(isSaving || hasUnsavedChanges) && (
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                       {isSaving ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Saving...</span>
-                        </>
+                        <><Loader2 className="h-4 w-4 animate-spin" /><span>Saving...</span></>
                       ) : (
-                        <>
-                          <span className="h-2 w-2 bg-orange-400 rounded-full"></span>
-                          <span>Unsaved</span>
-                        </>
+                        <><span className="h-2 w-2 bg-orange-400 rounded-full animate-pulse"></span><span>Unsaved</span></>
                       )}
                     </div>
                   )}
                   <Button
-                    size="sm"
+                    size="icon"
                     variant="ghost"
                     onClick={() => handleToggleFavorite(selectedNote.id)}
+                    aria-label="Toggle favorite"
                   >
                     <Star 
-                      className={cn(
-                        'h-4 w-4',
-                        selectedNote.is_favorited 
+                      className={cn('h-5 w-5', selectedNote.is_favorited 
                           ? 'text-yellow-500 fill-current' 
-                          : 'text-gray-400'
+                          : 'text-gray-400 dark:text-gray-500'
                       )} 
                     />
                   </Button>
                 </div>
               </div>
               
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <span>Created {formatDate(selectedNote.created_at)}</span>
-                <span>•</span>
-                <span>Modified {formatDate(selectedNote.last_modified)}</span>
-                <span>•</span>
-                <span>{selectedNote.content.length} characters</span>
+              <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                <span>Created: {new Date(selectedNote.created_at).toLocaleString()}</span>
+                <span>Modified: {formatDate(selectedNote.last_modified)}</span>
               </div>
             </div>
 
-            {/* Editor Content */}
-            <div className="flex-1 p-6">
+            <div className="flex-1 p-6 overflow-y-auto">
               <Textarea
                 ref={contentRef}
                 value={selectedNote.content}
                 onChange={(e) => handleUpdateNote('content', e.target.value)}
-                placeholder="Start writing..."
-                className="w-full h-full resize-none border-none shadow-none p-0 text-base leading-relaxed focus-visible:ring-0"
+                placeholder="Start writing your note here..."
+                className="w-full h-full resize-none border-none shadow-none p-0 text-base leading-relaxed focus-visible:ring-0 bg-transparent"
               />
             </div>
           </>
@@ -500,23 +443,20 @@ export function NotesInterface() {
           <div className="flex-1 flex items-center justify-center text-gray-500">
             <div className="text-center">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <h3 className="font-medium mb-2">Select a note to begin</h3>
-              <p className="text-sm">Choose a note from the list or create a new one</p>
+              <h3 className="font-semibold text-lg mb-2">Select a note</h3>
+              <p className="text-sm">Choose a note from the list to view or edit it.</p>
               <Button 
                 className="mt-4" 
                 onClick={handleCreateNote}
                 disabled={isCreatingNote}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Create Note
+                Create New Note
               </Button>
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
-
-// Integration: Enhanced notes interface that integrates with the persistent storage system for automatic note management per project.
-// Notes: Provides auto-save functionality, project-specific note isolation, and seamless integration with the enhanced app store.

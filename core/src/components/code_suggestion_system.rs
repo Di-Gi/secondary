@@ -293,7 +293,7 @@ impl CodeSuggestionSystem {
         let current_content = std::fs::read_to_string(&suggestion.location.path)
             .map_err(|e| SecondaryMindError::IoError {
                 path: suggestion.location.path.clone(),
-                source: e,
+                message: e.to_string(),
             })?;
 
         // Create backup if requested
@@ -302,7 +302,7 @@ impl CodeSuggestionSystem {
             std::fs::write(&backup_path, &current_content)
                 .map_err(|e| SecondaryMindError::IoError {
                     path: PathBuf::from(backup_path),
-                    source: e,
+                    message: e.to_string(),
                 })?;
         }
 
@@ -318,7 +318,7 @@ impl CodeSuggestionSystem {
         std::fs::write(&suggestion.location.path, &modified_content)
             .map_err(|e| SecondaryMindError::IoError {
                 path: suggestion.location.path.clone(),
-                source: e,
+                message: e.to_string(),
             })?;
 
         let application = SuggestionApplication {
@@ -345,7 +345,7 @@ impl CodeSuggestionSystem {
         std::fs::write(&application.file_path, &application.original_content)
             .map_err(|e| SecondaryMindError::IoError {
                 path: application.file_path.clone(),
-                source: e,
+                message: e.to_string(),
             })?;
 
         log::info!("Successfully undid suggestion: {}", application.suggestion_id);
@@ -358,7 +358,7 @@ impl CodeSuggestionSystem {
         let current_content = std::fs::read_to_string(&suggestion.location.path)
             .map_err(|e| SecondaryMindError::IoError {
                 path: suggestion.location.path.clone(),
-                source: e,
+                message: e.to_string(),
             })?;
 
         // Apply the replacement and return the result

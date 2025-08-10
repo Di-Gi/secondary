@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ProjectConfig, RecentProjects, AnalysisResult } from '../api';
+import { useAppStore } from '../store/appStore';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';

@@ -98,7 +98,7 @@ impl ProjectConfigurationService {
         let notes_dir = self.home_manager.get_project_notes_dir(project_path);
         let notes_count = if notes_dir.exists() {
             fs::read_dir(&notes_dir)
-                .map_err(|e| SecondaryMindError::IoError { path: notes_dir.clone(), source: e })?
+                .map_err(|e| SecondaryMindError::from_io_error(notes_dir.clone(), e))?
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| {
                     entry.path().extension()
@@ -120,7 +120,7 @@ impl ProjectConfigurationService {
         
         let mut config = if config_path.exists() {
             let content = fs::read_to_string(&config_path).map_err(|e| {
-                SecondaryMindError::IoError { path: config_path.clone(), source: e }
+                SecondaryMindError::from_io_error(config_path.clone(), e)
             })?;
             
             // Clone values before moving into closure
@@ -172,7 +172,7 @@ impl ProjectConfigurationService {
         })?;
         
         fs::write(&config_path, config_json).map_err(|e| {
-            SecondaryMindError::IoError { path: config_path, source: e }
+            SecondaryMindError::from_io_error(config_path, e)
         })?;
         
         // Update recent projects
@@ -188,7 +188,7 @@ impl ProjectConfigurationService {
         }
         
         let content = fs::read_to_string(&self.recent_projects_path).map_err(|e| {
-            SecondaryMindError::IoError { path: self.recent_projects_path.clone(), source: e }
+            SecondaryMindError::from_io_error(self.recent_projects_path.clone(), e)
         })?;
         
         serde_json::from_str(&content).map_err(|e| {
@@ -216,7 +216,7 @@ impl ProjectConfigurationService {
         })?;
         
         fs::write(&self.recent_projects_path, json).map_err(|e| {
-            SecondaryMindError::IoError { path: self.recent_projects_path.clone(), source: e }
+            SecondaryMindError::from_io_error(self.recent_projects_path.clone(), e)
         })?;
         
         Ok(())
@@ -232,7 +232,7 @@ impl ProjectConfigurationService {
         }
         
         let content = fs::read_to_string(&config_path).map_err(|e| {
-            SecondaryMindError::IoError { path: config_path, source: e }
+            SecondaryMindError::from_io_error(config_path, e)
         })?;
         
         let config = serde_json::from_str(&content).map_err(|e| {
@@ -253,7 +253,7 @@ impl ProjectConfigurationService {
         })?;
         
         fs::write(&self.recent_projects_path, json).map_err(|e| {
-            SecondaryMindError::IoError { path: self.recent_projects_path.clone(), source: e }
+            SecondaryMindError::from_io_error(self.recent_projects_path.clone(), e)
         })?;
         
         Ok(())

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Symbol } from '../api';
+import { Symbol, SearchRequest, SearchScope } from '../api';
+import { useAppStore } from '../store/appStore';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
@@ -43,11 +44,13 @@ export function EnhancedSymbolExplorer({
   onSymbolSelect, 
   onSymbolNavigate 
 }: EnhancedSymbolExplorerProps) {
+  const { searchSymbols, searchResults, isSearching, searchHistory } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSymbol, setSelectedSymbol] = useState<Symbol | null>(null);
   const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [symbolTypeFilters, setSymbolTypeFilters] = useState<SymbolTypeFilter[]>([]);
+  const [useEnhancedSearch, setUseEnhancedSearch] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -97,21 +100,52 @@ export function EnhancedSymbolExplorer({
     return patternIndex === patternLower.length ? score / (textLower.length * patternLower.length) : 0;
   }, []);
 
-  // Filter and group symbols
+  // Enhanced search handler
+  const handleEnhancedSearch = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+    
+    const enabledTypes = symbolTypeFilters.filter(f => f.enabled).map(f => f.type);
+    
+    const searchRequest: SearchRequest = {
+      query,
+      filters: {
+        symbol_types: enabledTypes,
+        file_patterns: [],
+        scope: { type: 'Global' },
+        max_results: 100
+      },
+      max_results: 100
+    };
+
+    try {
+      await searchSymbols(searchRequest);
+    } catch (error) {
+      console.error('Enhanced search failed:', error);
+    }
+  }, [searchSymbols, symbolTypeFilters]);
+
+  // Filter and group symbols (local or enhanced search results)
   const { filteredSymbols, groupedSymbols } = useMemo(() => {
+    const symbolsToProcess = useEnhancedSearch && searchResults.length > 0 
+      ? searchResults.map(result => result.symbol)
+      : symbols;
+
     const enabledTypes = new Set(
       symbolTypeFilters.filter(f => f.enabled).map(f => f.type)
     );
 
-    const filtered = symbols
+    const filtered = symbolsToProcess
       .filter(symbol => {
         const matchesType = enabledTypes.size === 0 || enabledTypes.has(symbol.kind);
+        if (useEnhancedSearch) return matchesType; // Enhanced search already filtered
         const matchesSearch = fuzzyMatch(symbol.identifier, searchTerm) > 0;
         return matchesType && matchesSearch;
       })
       .map(symbol => ({
         ...symbol,
-        searchScore: fuzzyMatch(symbol.identifier, searchTerm)
+        searchScore: useEnhancedSearch 
+          ? (searchResults.find(r => r.symbol.identifier === symbol.identifier)?.relevance_score || 0)
+          : fuzzyMatch(symbol.identifier, searchTerm)
       }))
       .sort((a, b) => b.searchScore - a.searchScore);
 
@@ -125,7 +159,7 @@ export function EnhancedSymbolExplorer({
     });
 
     return { filteredSymbols: filtered, groupedSymbols: grouped };
-  }, [symbols, searchTerm, symbolTypeFilters, fuzzyMatch]);
+  }, [symbols, searchTerm, symbolTypeFilters, fuzzyMatch, useEnhancedSearch, searchResults]);
 
   // Get flattened list for keyboard navigation
   const flatSymbolList = useMemo(() => {

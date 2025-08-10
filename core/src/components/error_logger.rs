@@ -4,14 +4,14 @@
 // Dependencies: log, serde, chrono, tokio.
 
 use crate::errors::{SecondaryMindError, ErrorContext, ErrorSeverity};
+use chrono::{DateTime, Utc, Duration, Timelike};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncWriteExt, BufWriter};
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc, Duration};
 use log::{error, warn, info, debug};
 
 /// Structured error logger with analytics and reporting capabilities
@@ -211,7 +211,8 @@ impl ErrorLogger {
 
         // Maintain memory limit
         if entries.len() > self.config.max_memory_entries {
-            entries.drain(0..entries.len() - self.config.max_memory_entries);
+            let excess = entries.len() - self.config.max_memory_entries;
+            entries.drain(0..excess);
         }
     }
 
@@ -439,7 +440,8 @@ impl ErrorLogger {
         }
 
         if let Some(error_type) = &criteria.error_type {
-            let entry_type = format!("{:?}", entry.context.error).split('(').next().unwrap_or("Unknown");
+            let error_debug = format!("{:?}", entry.context.error);
+            let entry_type = error_debug.split('(').next().unwrap_or("Unknown");
             if entry_type != *error_type {
                 return false;
             }

@@ -14,7 +14,7 @@ use syn::{File, Item};
 pub fn parse_rust_file(file_path: &Path) -> Result<Vec<Symbol>, SecondaryMindError> {
     let content = fs::read_to_string(file_path).map_err(|e| SecondaryMindError::IoError {
         path: file_path.to_path_buf(),
-        source: e,
+        message: e.to_string(),
     })?;
 
     let ast: File = syn::parse_file(&content).map_err(|e| SecondaryMindError::AstParsingError {

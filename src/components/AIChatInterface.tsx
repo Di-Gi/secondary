@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
+import { AIRequest } from '../api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent } from './ui/card';
@@ -16,12 +17,15 @@ interface ChatMessage {
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  confidence?: number;
+  sources?: string[];
 }
 
 export function AIChatInterface() {
-  const { synthesizeGuidance } = useAppStore();
+  const { synthesizeGuidance, enhancedAISynthesis, isAIProcessing, currentProject } = useAppStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [useEnhancedAI] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +38,7 @@ export function AIChatInterface() {
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isAIProcessing) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -45,16 +49,41 @@ export function AIChatInterface() {
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
-    setIsLoading(true);
 
     try {
-      const response = await synthesizeGuidance(userMessage.content);
-      
+      let response: string;
+      let confidence: number | undefined;
+      let sources: string[] | undefined;
+
+      if (useEnhancedAI && currentProject) {
+        const aiRequest: AIRequest = {
+          query: userMessage.content,
+          context: {
+            current_file: null,
+            current_file_content: null,
+            selected_code: null,
+            selection_range: null,
+            related_symbols: currentProject.symbols.slice(0, 10), // Include some context
+            project_context: `Project: ${currentProject.project_path}`
+          },
+          response_type: 'guidance'
+        };
+
+        const aiResponse = await enhancedAISynthesis(aiRequest);
+        response = aiResponse.content;
+        confidence = aiResponse.confidence_score;
+        sources = aiResponse.sources;
+      } else {
+        response = await synthesizeGuidance(userMessage.content);
+      }
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
         content: response,
         timestamp: new Date(),
+        confidence,
+        sources,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -67,8 +96,6 @@ export function AIChatInterface() {
       };
 
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -83,7 +110,7 @@ export function AIChatInterface() {
     // Simple code block detection and formatting
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
     const parts = content.split(codeBlockRegex);
-    
+
     return parts.map((part, index) => {
       if (index % 3 === 2) {
         // This is code content
@@ -143,7 +170,7 @@ export function AIChatInterface() {
                 <Bot className="h-4 w-4 text-blue-600" />
               </div>
             )}
-            
+
             <Card className={`max-w-[80%] ${message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white'}`}>
               <CardContent className="p-3">
                 <div className={`text-sm ${message.type === 'user' ? 'text-white' : 'text-gray-900'}`}>
@@ -194,7 +221,7 @@ export function AIChatInterface() {
             disabled={isLoading}
             className="flex-1"
           />
-          <Button 
+          <Button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
             size="sm"

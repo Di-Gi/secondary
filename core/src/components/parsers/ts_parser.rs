@@ -16,7 +16,7 @@ pub fn parse_ts_file(file_path: &Path) -> Result<Vec<Symbol>, SecondaryMindError
     let cm: Lrc<SourceMap> = Default::default();
     let source_file = cm.load_file(file_path).map_err(|e| SecondaryMindError::IoError {
         path: file_path.to_path_buf(),
-        source: e,
+        message: e.to_string(),
     })?;
 
     let syntax = Syntax::Typescript(TsConfig {

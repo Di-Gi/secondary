@@ -109,11 +109,12 @@ export function useAsyncOperation<T = any>(
     });
 
     const executeWithRetry = async (attempt: number): Promise<T | null> => {
+      const signal = abortControllerRef.current!.signal;
+      
+      // Set up timeout if specified
+      let timeoutId: NodeJS.Timeout | undefined;
+      
       try {
-        const signal = abortControllerRef.current!.signal;
-        
-        // Set up timeout if specified
-        let timeoutId: NodeJS.Timeout | undefined;
         if (timeout) {
           timeoutId = setTimeout(() => {
             abortControllerRef.current?.abort();

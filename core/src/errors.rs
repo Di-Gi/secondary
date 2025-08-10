@@ -72,7 +72,7 @@ pub enum SecondaryMindError {
 }
 
 /// Error severity levels for prioritizing error handling
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ErrorSeverity {
     /// Low severity - component can continue with degraded functionality
     Low,

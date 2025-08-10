@@ -444,9 +444,10 @@ impl SymbolRelationshipTracker {
         
         // Check for cycles
         if result.len() != self.symbol_definitions.len() {
-            return Err(SecondaryMindError::SearchIndexError(
-                "Circular dependency detected in symbol graph".to_string()
-            ));
+            return Err(SecondaryMindError::SearchIndexError {
+                operation: "topological_sort".to_string(),
+                reason: "Circular dependency detected in symbol graph".to_string()
+            });
         }
         
         Ok(result)

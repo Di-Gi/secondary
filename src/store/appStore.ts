@@ -4,7 +4,7 @@
 // Dependencies: Enhanced API layer, new type definitions, existing Zustand patterns.
 
 import { create } from 'zustand';
-import { api, AnalysisResult, GitStatus, RecentProjects, ProjectNote, isDevelopmentMode } from '../api';
+import { api, AnalysisResult, GitStatus, RecentProjects, ProjectNote, SearchRequest, SearchResult, AIRequest, AIResponse, isDevelopmentMode } from '../api';
 
 interface AppState {
   // Current project state
@@ -18,6 +18,19 @@ interface AppState {
   projectNotes: ProjectNote[];
   isNotesLoading: boolean;
   
+  // Search state
+  searchResults: SearchResult[];
+  isSearching: boolean;
+  searchHistory: string[];
+  
+  // AI state
+  aiResponses: AIResponse[];
+  isAIProcessing: boolean;
+  
+  // Session state
+  currentSession: any;
+  isSessionLoading: boolean;
+  
   // UI state
   isLoading: boolean;
   error: string | null;
@@ -30,6 +43,19 @@ interface AppState {
   refreshGitStatus: () => Promise<void>;
   synthesizeGuidance: (query: string) => Promise<string>;
   clearProject: () => void;
+  
+  // Enhanced search actions
+  searchSymbols: (request: SearchRequest) => Promise<SearchResult[]>;
+  clearSearchResults: () => void;
+  addToSearchHistory: (query: string) => void;
+  
+  // Enhanced AI actions
+  enhancedAISynthesis: (request: AIRequest) => Promise<AIResponse>;
+  clearAIResponses: () => void;
+  
+  // Session actions
+  saveSession: (sessionData: any) => Promise<void>;
+  loadSession: () => Promise<void>;
   
   // Note actions
   loadProjectNotes: (projectPath: string) => Promise<void>;
@@ -45,6 +71,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   recentProjects: null,
   projectNotes: [],
   isNotesLoading: false,
+  searchResults: [],
+  isSearching: false,
+  searchHistory: [],
+  aiResponses: [],
+  isAIProcessing: false,
+  currentSession: null,
+  isSessionLoading: false,
   isLoading: false,
   error: null,
 
@@ -88,8 +121,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         error: null,
       });
 
-      // Load project notes
-      await get().loadProjectNotes(projectPath);
+      // Load project notes and session
+      await Promise.all([
+        get().loadProjectNotes(projectPath),
+        get().loadSession(),
+      ]);
+      
+      // Start file watching for real-time updates
+      try {
+        await api.startFileWatching(projectPath);
+      } catch (error) {
+        console.warn('File watching not available:', error);
+      }
       
       // Refresh recent projects to update last accessed time
       await get().loadRecentProjects();
@@ -210,6 +253,80 @@ export const useAppStore = create<AppState>((set, get) => ({
           : note
       )
     }));
+  },
+
+  // Enhanced search functionality
+  searchSymbols: async (request: SearchRequest) => {
+    set({ isSearching: true });
+    try {
+      const results = await api.searchSymbols(request);
+      set({ searchResults: results, isSearching: false });
+      get().addToSearchHistory(request.query);
+      return results;
+    } catch (error) {
+      set({ isSearching: false, error: `Search failed: ${error}` });
+      throw error;
+    }
+  },
+
+  clearSearchResults: () => {
+    set({ searchResults: [] });
+  },
+
+  addToSearchHistory: (query: string) => {
+    set(state => ({
+      searchHistory: [query, ...state.searchHistory.filter(q => q !== query)].slice(0, 10)
+    }));
+  },
+
+  // Enhanced AI synthesis
+  enhancedAISynthesis: async (request: AIRequest) => {
+    set({ isAIProcessing: true });
+    try {
+      const response = await api.enhancedAISynthesis(request);
+      set(state => ({
+        aiResponses: [response, ...state.aiResponses].slice(0, 20),
+        isAIProcessing: false
+      }));
+      return response;
+    } catch (error) {
+      set({ isAIProcessing: false, error: `AI synthesis failed: ${error}` });
+      throw error;
+    }
+  },
+
+  clearAIResponses: () => {
+    set({ aiResponses: [] });
+  },
+
+  // Session management
+  saveSession: async (sessionData: any) => {
+    const { currentProject } = get();
+    if (!currentProject) {
+      throw new Error('No project loaded');
+    }
+
+    try {
+      await api.saveSession(currentProject.project_path, sessionData);
+      set({ currentSession: sessionData });
+    } catch (error) {
+      console.error('Failed to save session:', error);
+      throw error;
+    }
+  },
+
+  loadSession: async () => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    set({ isSessionLoading: true });
+    try {
+      const session = await api.loadSession(currentProject.project_path);
+      set({ currentSession: session, isSessionLoading: false });
+    } catch (error) {
+      console.error('Failed to load session:', error);
+      set({ isSessionLoading: false });
+    }
   },
 }));
 

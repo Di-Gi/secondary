@@ -286,7 +286,10 @@ impl AdvancedSearchEngine {
             cached_regex.clone()
         } else {
             Regex::new(&query.query)
-                .map_err(|e| SecondaryMindError::SearchIndexError(format!("Invalid regex: {}", e)))?
+                .map_err(|e| SecondaryMindError::SearchIndexError {
+                    operation: "regex_compile".to_string(),
+                    reason: format!("Invalid regex: {}", e)
+                })?
         };
         
         let mut results = Vec::new();
@@ -658,9 +661,10 @@ impl AdvancedSearchEngine {
         let query = if let Some(saved_search) = self.saved_searches.get(search_id) {
             saved_search.query.clone()
         } else {
-            return Err(SecondaryMindError::SearchIndexError(
-                format!("Saved search not found: {}", search_id)
-            ));
+            return Err(SecondaryMindError::SearchIndexError {
+                operation: "load_saved_search".to_string(),
+                reason: format!("Saved search not found: {}", search_id)
+            });
         };
         
         // Update usage stats

@@ -416,7 +416,7 @@ impl EnhancedProjectConfigService {
         })?;
         
         fs::write(&config_path, config_json).map_err(|e| {
-            SecondaryMindError::IoError { path: config_path.clone(), source: e }
+            SecondaryMindError::from_io_error(config_path.clone(), e)
         })?;
         
         // Update cache
@@ -442,7 +442,7 @@ impl EnhancedProjectConfigService {
         }
         
         let content = fs::read_to_string(&config_path).map_err(|e| {
-            SecondaryMindError::IoError { path: config_path, source: e }
+            SecondaryMindError::from_io_error(config_path, e)
         })?;
         
         let mut config: EnhancedProjectConfig = serde_json::from_str(&content).map_err(|e| {

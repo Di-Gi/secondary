@@ -144,7 +144,7 @@ impl EnhancedAnalysisEngine {
                 let metadata = fs::metadata(file_path)
                     .map_err(|e| SecondaryMindError::IoError { 
                         path: file_path.to_path_buf(), 
-                        source: e 
+                        message: e.to_string() 
                     })?;
                 
                 let current_modified = metadata.modified().unwrap_or(SystemTime::now());
@@ -157,7 +157,7 @@ impl EnhancedAnalysisEngine {
                     let content = fs::read_to_string(file_path)
                         .map_err(|e| SecondaryMindError::IoError { 
                             path: file_path.to_path_buf(), 
-                            source: e 
+                            message: e.to_string() 
                         })?;
                     
                     let current_hash = self.calculate_content_hash(&content);
@@ -183,14 +183,14 @@ impl EnhancedAnalysisEngine {
         let content = fs::read_to_string(file_path)
             .map_err(|e| SecondaryMindError::IoError { 
                 path: file_path.to_path_buf(), 
-                source: e 
+                message: e.to_string() 
             })?;
 
         let content_hash = self.calculate_content_hash(&content);
         let last_modified = fs::metadata(file_path)
             .map_err(|e| SecondaryMindError::IoError { 
                 path: file_path.to_path_buf(), 
-                source: e 
+                message: e.to_string() 
             })?
             .modified()
             .unwrap_or(SystemTime::now());
@@ -293,7 +293,7 @@ impl EnhancedAnalysisEngine {
         for entry in walkdir::WalkDir::new(project_path) {
             let entry = entry.map_err(|e| SecondaryMindError::IoError { 
                 path: project_path.to_path_buf(), 
-                source: std::io::Error::new(std::io::ErrorKind::Other, e) 
+                message: format!("Walk directory error: {}", e)
             })?;
             
             if entry.file_type().is_file() {

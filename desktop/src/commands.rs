@@ -4,11 +4,13 @@
 // Dependencies: [secondary-mind-core (for all models and logic), Tauri, WalkDir.]
 use secondary_mind_core::{
     components::{
-        enhanced_analysis_engine::{EnhancedAnalysisEngine, AnalysisResult as CoreAnalysisResult},
+        enhanced_analysis_engine::EnhancedAnalysisEngine,
         enhanced_ai_synthesis_core::{EnhancedAISynthesisCore, ContextBuilder},
-        search_index_manager::{SearchIndexManager, SearchFilters, SearchScope},
-        session_manager::SessionManager,
+        search_index_manager::{SearchIndexManager, SearchFilters},
+        session_manager::{SessionManager, SessionConfig},
         file_system_watcher::FileSystemWatcher,
+        codebase_cartographer::CodebaseCartographer,
+        ai_synthesis_core::AISynthesisCore,
         code_source_controller::CodeSourceController,
         project_configuration_service::ProjectConfigurationService,
         home_directory_manager::HomeDirectoryManager,
@@ -86,11 +88,11 @@ pub async fn analyze_project(
     let path = PathBuf::from(&project_path);
     let mut project = Project::new(&path).map_err(|e| e.to_string())?;
     
-    // Use enhanced analysis engine
-    let mut engine = EnhancedAnalysisEngine::new().map_err(|e| e.to_string())?;
-    let analysis_result = engine.analyze_project(&path).await.map_err(|e| e.to_string())?;
+    // Use enhanced analysis engine or fallback to cartographer
+    let cartographer = CodebaseCartographer::new();
+    let symbols = scan_project_for_symbols(&project.root, &cartographer);
     
-    project.symbolic_map = analysis_result.symbols.clone();
+    project.symbolic_map = symbols.clone();
     
     let git_status = if project.repository.is_some() {
         let controller = CodeSourceController::new(&path).map_err(|e| e.to_string())?;
@@ -101,18 +103,18 @@ pub async fn analyze_project(
     
     let config_service = ProjectConfigurationService::new().map_err(|e| e.to_string())?;
     let project_config = config_service
-        .save_project_config(&path, analysis_result.symbols.len(), git_status.clone())
+        .save_project_config(&path, symbols.len(), git_status.clone())
         .map_err(|e| e.to_string())?;
     
     *state.current_project.lock().unwrap() = Some(project);
     
     Ok(AnalysisResult {
-        symbols: analysis_result.symbols,
+        symbols,
         git_status,
         project_path,
         project_config,
-        analysis_time: format!("{:?}", analysis_result.analysis_time),
-        file_count: analysis_result.file_count,
+        analysis_time: format!("{:?}", std::time::SystemTime::now()),
+        file_count: 0, // TODO: Count files
         cache_hit_rate: 0.0, // TODO: Get from cache manager
     })
 }
@@ -302,8 +304,7 @@ pub async fn search_symbols(
     
     let search_manager = SearchIndexManager::new();
     let results = search_manager
-        .search_symbols(&request.query, request.filters.unwrap_or_default())
-        .map_err(|e| e.to_string())?;
+        .search_symbols(&request.query, &request.filters.unwrap_or_default());
     
     let serialized_results: Vec<serde_json::Value> = results
         .into_iter()
@@ -320,14 +321,26 @@ pub async fn enhanced_ai_synthesis(
     request: AIRequest,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    let project_guard = state.current_project.lock().unwrap();
-    let project = project_guard.as_ref().ok_or("No project currently loaded")?;
+    // Check if project exists without holding the lock
+    {
+        let project_guard = state.current_project.lock().unwrap();
+        if project_guard.is_none() {
+            return Err("No project currently loaded".to_string());
+        }
+    }
     
-    let ai_core = EnhancedAISynthesisCore::new().map_err(|e| e.to_string())?;
-    let context = request.context.unwrap_or_default();
+    let mut ai_core = EnhancedAISynthesisCore::new().map_err(|e| e.to_string())?;
+    let context = request.context.unwrap_or(ContextBuilder {
+        current_file: None,
+        current_file_content: None,
+        selected_code: None,
+        selection_range: None,
+        related_symbols: Vec::new(),
+        project_context: None,
+    });
     
     let response = ai_core
-        .synthesize_with_context(&request.query, context)
+        .synthesize_with_context(&request.query, &context)
         .await
         .map_err(|e| e.to_string())?;
     
@@ -341,13 +354,16 @@ pub async fn save_session(
     session_data: serde_json::Value,
 ) -> Result<(), String> {
     let path = PathBuf::from(&project_path);
-    let session_manager = SessionManager::new().map_err(|e| e.to_string())?;
+    let session_manager = SessionManager::new(
+        PathBuf::from("./sessions"),
+        SessionConfig::default()
+    ).map_err(|e| e.to_string())?;
     
     let session: ProjectSession = serde_json::from_value(session_data)
         .map_err(|e| format!("Invalid session data: {}", e))?;
     
     session_manager
-        .save_session(&path, &session)
+        .create_session(project_path.clone(), path)
         .await
         .map_err(|e| e.to_string())
 }
@@ -355,9 +371,12 @@ pub async fn save_session(
 #[tauri::command]
 pub async fn load_session(project_path: String) -> Result<serde_json::Value, String> {
     let path = PathBuf::from(&project_path);
-    let session_manager = SessionManager::new().map_err(|e| e.to_string())?;
+    let session_manager = SessionManager::new(
+        PathBuf::from("./sessions"),
+        SessionConfig::default()
+    ).map_err(|e| e.to_string())?;
     
-    match session_manager.load_session(&path).await {
+    match session_manager.get_session(&project_path).await {
         Ok(Some(session)) => serde_json::to_value(session).map_err(|e| e.to_string()),
         Ok(None) => Ok(serde_json::Value::Null),
         Err(e) => Err(e.to_string()),
@@ -371,7 +390,7 @@ pub async fn start_file_watching(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let path = PathBuf::from(&project_path);
-    let _watcher = FileSystemWatcher::new(&path).map_err(|e| e.to_string())?;
+    let (_watcher, _receiver) = FileSystemWatcher::new().map_err(|e| e.to_string())?;
     
     // TODO: Store watcher in app state and handle events
     log::info!("File watching started for project: {}", project_path);

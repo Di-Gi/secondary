@@ -167,12 +167,13 @@ impl OperationManager {
         };
 
         // Register operation
+        let title = operation_info.metadata.title.clone();
         {
             let mut operations = self.operations.write().await;
             operations.insert(id.clone(), operation_info);
         }
 
-        info!("Started operation: {} ({})", id, operation_info.metadata.title);
+        info!("Started operation: {} ({})", id, title);
 
         OperationHandle {
             id,

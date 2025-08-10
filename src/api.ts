@@ -222,34 +222,16 @@ export const api = {
     } else {
       console.log('🔧 Development mode: Using mock analysis result');
       await new Promise(resolve => setTimeout(resolve, 1500));
-      // UPDATED MOCK with Rust symbols and missing properties
       return {
         symbols: [
-          {
-            identifier: 'UserService',
-            kind: 'TSClass',
-            location: { path: '/src/services/user.ts', line: 15, column: 1 }
-          },
-          {
-            identifier: 'authenticateUser',
-            kind: 'TSFunction',
-            location: { path: '/src/auth/auth.ts', line: 23, column: 1 }
-          },
-          {
-            identifier: 'AppState',
-            kind: 'Struct',
-            location: { path: '/src/main.rs', line: 42, column: 1 }
-          },
-           {
-            identifier: 'run_analysis',
-            kind: 'Function',
-            location: { path: '/src/analysis.rs', line: 88, column: 1 }
-          },
+          { identifier: 'UserService', kind: 'TSClass', location: { path: '/src/services/user.ts', line: 15, column: 1 } },
+          { identifier: 'authenticateUser', kind: 'TSFunction', location: { path: '/src/auth/auth.ts', line: 23, column: 1 } },
+          { identifier: 'AppState', kind: 'Struct', location: { path: '/src/main.rs', line: 42, column: 1 } },
+          { identifier: 'run_analysis', kind: 'Function', location: { path: '/src/analysis.rs', line: 88, column: 1 } },
         ],
         git_status: ['main', 'Up-to-date with origin/main'],
         project_path: projectPath,
         project_config: MOCK_RECENT_PROJECTS.projects[0],
-        // ✨ FIX: Added missing properties with mock values
         analysis_time: '1.42s',
         file_count: 178,
         cache_hit_rate: 0.85,
@@ -280,10 +262,7 @@ export const api = {
     } else {
       console.log('🔧 Development mode: Using mock git status');
       await new Promise(resolve => setTimeout(resolve, 500));
-      return {
-        local_branch: 'main',
-        remote_status: 'Up-to-date with origin/main'
-      };
+      return { local_branch: 'main', remote_status: 'Up-to-date with origin/main' };
     }
   },
 
@@ -342,76 +321,59 @@ export const api = {
       console.log('🔧 Development mode: Note deletion simulated');
     }
   },
-
+  
   // Session management API functions
-  async createSession(projectId: string, projectPath: string): Promise<void> {
+  async saveSession(projectPath: string, sessionData: any): Promise<void> {
     if (isTauri()) {
       try {
-        await invoke('create_session', { projectId, projectPath });
+        // Corrected to use the existing backend command for both create and update
+        await invoke('save_session', { projectPath, sessionData });
       } catch (error) {
-        console.error('Failed to create session:', error);
+        console.error('Failed to save session:', error);
         throw error;
       }
     } else {
-      console.log('🔧 Development mode: Session creation simulated');
+      console.log('🔧 Development mode: Session save/create simulated');
     }
   },
 
-  async getSession(projectId: string): Promise<any | null> {
+  async loadSession(projectPath: string): Promise<any> {
     if (isTauri()) {
       try {
-        return await invoke('get_session', { projectId });
+        // Corrected to use the backend's `load_session` command
+        return await invoke('load_session', { projectPath });
       } catch (error) {
-        console.error('Failed to get session:', error);
+        // The error "command not found" is a valid result here if the command doesn't exist
+        if (typeof error === 'string' && error.includes('not found')) {
+            console.warn(`Command 'load_session' not found, treating as no session.`);
+            return null;
+        }
+        console.error('Failed to load session:', error);
         throw error;
       }
     } else {
-      console.log('🔧 Development mode: Using mock session');
+      console.log('🔧 Development mode: Using mock session (null)');
       await new Promise(resolve => setTimeout(resolve, 200));
-      // Return null to simulate no existing session
       return null;
     }
   },
 
-  async updateSession(session: any): Promise<void> {
-    if (isTauri()) {
-      try {
-        await invoke('update_session', { session });
-      } catch (error) {
-        console.error('Failed to update session:', error);
-        throw error;
-      }
-    } else {
-      console.log('🔧 Development mode: Session update simulated');
-    }
-  },
-
+  // These commands are not implemented in the provided backend.
+  // They are stubbed here to prevent crashes and log warnings.
   async deleteSession(projectId: string): Promise<void> {
-    if (isTauri()) {
-      try {
-        await invoke('delete_session', { projectId });
-      } catch (error) {
-        console.error('Failed to delete session:', error);
-        throw error;
-      }
-    } else {
-      console.log('🔧 Development mode: Session deletion simulated');
+    console.warn(`[API] The 'delete_session' command is not implemented in the backend.`);
+    if (!isTauri()) {
+        console.log('🔧 Development mode: Session deletion simulated');
     }
   },
 
   async listSessions(): Promise<any[]> {
-    if (isTauri()) {
-      try {
-        return await invoke('list_sessions');
-      } catch (error) {
-        console.error('Failed to list sessions:', error);
-        throw error;
+      console.warn(`[API] The 'list_sessions' command is not implemented in the backend.`);
+      if (!isTauri()) {
+          console.log('🔧 Development mode: Using mock session list (empty)');
+          return [];
       }
-    } else {
-      console.log('🔧 Development mode: Using mock session list');
-      await new Promise(resolve => setTimeout(resolve, 200));
       return [];
-    }
   },
 
   // Enhanced search functionality
@@ -426,18 +388,7 @@ export const api = {
     } else {
       console.log('🔧 Development mode: Using mock search results');
       await new Promise(resolve => setTimeout(resolve, 300));
-      return [
-        {
-          symbol: {
-            identifier: 'UserService',
-            kind: 'TSClass',
-            location: { path: '/src/services/user.ts', line: 15, column: 1 }
-          },
-          relevance_score: 0.95,
-          match_type: 'exact',
-          context: { snippet: 'class UserService {' }
-        }
-      ];
+      return [{ symbol: { identifier: 'UserService', kind: 'TSClass', location: { path: '/src/services/user.ts', line: 15, column: 1 } }, relevance_score: 0.95, match_type: 'exact', context: { snippet: 'class UserService {' } }];
     }
   },
 
@@ -453,42 +404,7 @@ export const api = {
     } else {
       console.log('🔧 Development mode: Using mock AI response');
       await new Promise(resolve => setTimeout(resolve, 1500));
-      return {
-        content: `Enhanced AI Response: Based on your query "${request.query}", I found relevant patterns with high confidence.`,
-        confidence_score: 0.87,
-        sources: ['/src/services/user.ts', '/src/auth/auth.ts'],
-        response_type: request.response_type,
-        timestamp: new Date().toISOString()
-      };
-    }
-  },
-
-  // Session management
-  async saveSession(projectPath: string, sessionData: any): Promise<void> {
-    if (isTauri()) {
-      try {
-        await invoke('save_session', { projectPath, sessionData });
-      } catch (error) {
-        console.error('Failed to save session:', error);
-        throw error;
-      }
-    } else {
-      console.log('🔧 Development mode: Session save simulated');
-    }
-  },
-
-  async loadSession(projectPath: string): Promise<any> {
-    if (isTauri()) {
-      try {
-        return await invoke('load_session', { projectPath });
-      } catch (error) {
-        console.error('Failed to load session:', error);
-        throw error;
-      }
-    } else {
-      console.log('🔧 Development mode: Using mock session');
-      await new Promise(resolve => setTimeout(resolve, 200));
-      return null;
+      return { content: `Enhanced AI Response: Based on your query "${request.query}", I found relevant patterns with high confidence.`, confidence_score: 0.87, sources: ['/src/services/user.ts', '/src/auth/auth.ts'], response_type: request.response_type, timestamp: new Date().toISOString() };
     }
   },
 
@@ -509,5 +425,3 @@ export const api = {
 
 // Utility to check current mode
 export const isDevelopmentMode = () => !isTauri();
-// Integration: [This file is imported by `appStore.ts` and various UI components. The updated `Symbol` interface ensures type safety when handling data from the polyglot backend.]
-// Notes: [The `Symbol` kind is now a union of all possible kinds from the Rust backend, ensuring compile-time safety. The mock data has also been updated to reflect this.]

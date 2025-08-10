@@ -12,7 +12,6 @@ import { useAppStore } from '../store/appStore';
  */
 export const useSessionRestore = () => {
   const initializeSession = useSessionStore(state => state.initializeSession);
-  // const restoreSession = useSessionStore(state => state.restoreSession);
   const currentProject = useAppStore(state => state.currentProject);
   const sessionError = useSessionStore(state => state.sessionError);
   const isSessionLoading = useSessionStore(state => state.isSessionLoading);
@@ -115,27 +114,30 @@ export const useSessionMigration = () => {
  * Hook for managing workspace state restoration
  */
 export const useWorkspaceRestore = () => {
-  const openFiles = useSessionStore(state => state.openFiles);
-  const workspaceLayout = useSessionStore(state => state.workspaceLayout);
-  const bookmarks = useSessionStore(state => state.bookmarks);
-  const updatePanelState = useSessionStore(state => state.updatePanelState);
-  const updateSplitterState = useSessionStore(state => state.updateSplitterState);
-  const openFile = useSessionStore(state => state.openFile);
+  // Select actions, which are stable and won't cause re-renders.
+  const { updatePanelState, updateSplitterState, openFile } = useSessionStore(state => ({
+    updatePanelState: state.updatePanelState,
+    updateSplitterState: state.updateSplitterState,
+    openFile: state.openFile,
+  }));
 
+  // By using `getState()` inside `useCallback`, we avoid a dependency on `workspaceLayout`
+  // which prevents the infinite loop. The callback will always get the freshest state when called.
   const restoreWorkspaceLayout = useCallback(() => {
-    // Restore panel states
+    const { workspaceLayout } = useSessionStore.getState();
+
     Object.entries(workspaceLayout.panels).forEach(([panelId, panelState]) => {
       updatePanelState(panelId, panelState);
     });
 
-    // Restore splitter positions
     Object.entries(workspaceLayout.splitters).forEach(([splitterId, splitterState]) => {
       updateSplitterState(splitterId, splitterState);
     });
-  }, [workspaceLayout, updatePanelState, updateSplitterState]);
+  }, [updatePanelState, updateSplitterState]); // Dependencies are now stable.
 
   const restoreOpenFiles = useCallback(() => {
-    // Restore open files in order of last access
+    const { openFiles } = useSessionStore.getState();
+    
     const sortedFiles = [...openFiles].sort((a, b) => 
       new Date(b.last_accessed).getTime() - new Date(a.last_accessed).getTime()
     );
@@ -143,7 +145,7 @@ export const useWorkspaceRestore = () => {
     sortedFiles.forEach(file => {
       openFile(file.path, file.cursor_position);
     });
-  }, [openFiles, openFile]);
+  }, [openFile]); // Dependency is stable.
 
   const restoreWorkspace = useCallback(() => {
     restoreWorkspaceLayout();
@@ -154,31 +156,35 @@ export const useWorkspaceRestore = () => {
     restoreWorkspace,
     restoreWorkspaceLayout,
     restoreOpenFiles,
-    openFilesCount: openFiles.length,
-    bookmarksCount: bookmarks.length,
+    // Subscribe to primitive counts, which is more efficient than the whole array.
+    openFilesCount: useSessionStore(state => state.openFiles.length),
+    bookmarksCount: useSessionStore(state => state.bookmarks.length),
   };
 };
+
 
 /**
  * Hook for handling session cleanup and optimization
  */
 export const useSessionCleanup = () => {
-  const currentSession = useSessionStore(state => state.currentSession);
-  const chatHistory = useSessionStore(state => state.chatHistory);
-  const searchHistory = useSessionStore(state => state.searchHistory);
-  const clearChatHistory = useSessionStore(state => state.clearChatHistory);
-  const clearSearchHistory = useSessionStore(state => state.clearSearchHistory);
-  const saveSession = useSessionStore(state => state.saveSession);
+  const { currentSession, chatHistory, searchHistory, clearChatHistory, clearSearchHistory, saveSession, addChatMessage, addSearchQuery } = useSessionStore(state => ({
+    currentSession: state.currentSession,
+    chatHistory: state.chatHistory,
+    searchHistory: state.searchHistory,
+    clearChatHistory: state.clearChatHistory,
+    clearSearchHistory: state.clearSearchHistory,
+    saveSession: state.saveSession,
+    addChatMessage: state.addChatMessage,
+    addSearchQuery: state.addSearchQuery
+  }));
 
   const cleanupChatHistory = useCallback(async (maxMessages: number = 1000) => {
     if (chatHistory.length > maxMessages) {
-      // Keep only the most recent messages
       const messagesToKeep = chatHistory.slice(-maxMessages);
       clearChatHistory();
       
-      // Re-add the messages we want to keep
       messagesToKeep.forEach(message => {
-        useSessionStore.getState().addChatMessage({
+        addChatMessage({
           role: message.role,
           content: message.content,
           context: message.context,
@@ -187,21 +193,20 @@ export const useSessionCleanup = () => {
       
       await saveSession();
     }
-  }, [chatHistory, clearChatHistory, saveSession]);
+  }, [chatHistory, clearChatHistory, saveSession, addChatMessage]);
 
   const cleanupSearchHistory = useCallback(async (maxSearches: number = 50) => {
     if (searchHistory.length > maxSearches) {
       const searchesToKeep = searchHistory.slice(0, maxSearches);
       clearSearchHistory();
       
-      // Re-add the searches we want to keep
       searchesToKeep.forEach(query => {
-        useSessionStore.getState().addSearchQuery(query);
+        addSearchQuery(query);
       });
       
       await saveSession();
     }
-  }, [searchHistory, clearSearchHistory, saveSession]);
+  }, [searchHistory, clearSearchHistory, saveSession, addSearchQuery]);
 
   const optimizeSession = useCallback(async () => {
     await cleanupChatHistory();

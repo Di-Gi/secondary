@@ -4,8 +4,7 @@
 // Dependencies: React, Lucide icons, Tailwind CSS.
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, Bug, ChevronDown, ChevronUp, Copy, ExternalLink } from 'lucide-react';
-import { useToast } from './ToastNotification';
+import { AlertTriangle, RefreshCw, Bug, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -213,7 +212,7 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = ({
   onReload,
   onToggleDetails,
   onCopyDetails,
-  onReset,
+  onReset: _onReset,
 }) => {
   const getErrorTitle = () => {
     switch (level) {

@@ -3,7 +3,7 @@
 // Architecture: Uses AST analysis to extract patterns, maintains pattern database, and provides similarity matching
 // Dependencies: crate::{components::enhanced_ai_synthesis_core, errors, model::symbol}, serde, std::{collections::HashMap, path::PathBuf}
 
-use crate::components::enhanced_ai_synthesis_core::{EnhancedAISynthesisCore, ContextBuilder};
+use crate::components::ai_synthesis_core::{AISynthesisCore, ContextBuilder};
 use crate::errors::SecondaryMindError;
 use crate::model::symbol::{Symbol, SymbolKind};
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 /// Pattern recognition system for code analysis and similarity detection
 pub struct PatternRecognitionSystem {
-    ai_core: EnhancedAISynthesisCore,
+    ai_core: AISynthesisCore,
     pattern_database: PatternDatabase,
     similarity_engine: SimilarityEngine,
 }
@@ -136,7 +136,7 @@ pub struct PatternRecommendation {
 impl PatternRecognitionSystem {
     /// Creates a new pattern recognition system
     pub fn new() -> Result<Self, SecondaryMindError> {
-        let ai_core = EnhancedAISynthesisCore::new()?;
+        let ai_core = AISynthesisCore::new()?;
         let pattern_database = PatternDatabase::new();
         let similarity_engine = SimilarityEngine::new(0.7); // 70% similarity threshold
         
@@ -553,7 +553,7 @@ impl SimilarityEngine {
     }
 }
 
-// Integration: This component works with EnhancedAISynthesisCore for pattern analysis and maintains a database of common patterns
+// Integration: This component works with AISynthesisCore for pattern analysis and maintains a database of common patterns
 // Notes: The pattern recognition uses AI to identify patterns and provides refactoring suggestions based on detected patterns
 
 #[cfg(test)]

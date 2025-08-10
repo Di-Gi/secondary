@@ -3,7 +3,7 @@
 // Architecture: Uses AI synthesis core with symbol context to generate contextual documentation
 // Dependencies: crate::{components::enhanced_ai_synthesis_core, errors, model::symbol}, serde, std::{collections::HashMap, path::PathBuf}
 
-use crate::components::enhanced_ai_synthesis_core::{EnhancedAISynthesisCore, ContextBuilder};
+use crate::components::ai_synthesis_core::{AISynthesisCore, ContextBuilder};
 use crate::errors::SecondaryMindError;
 use crate::model::symbol::{Symbol, SymbolKind};
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// Documentation generator with template system and quality scoring
 pub struct DocumentationGenerator {
-    ai_core: EnhancedAISynthesisCore,
+    ai_core: AISynthesisCore,
     templates: HashMap<DocumentationFormat, DocumentationTemplate>,
     quality_scorer: DocumentationQualityScorer,
 }
@@ -82,7 +82,7 @@ pub enum SeverityLevel {
 impl DocumentationGenerator {
     /// Creates a new documentation generator
     pub fn new() -> Result<Self, SecondaryMindError> {
-        let ai_core = EnhancedAISynthesisCore::new()?;
+        let ai_core = AISynthesisCore::new()?;
         let templates = Self::create_default_templates();
         let quality_scorer = DocumentationQualityScorer;
         
@@ -416,7 +416,7 @@ impl DocumentationQualityScorer {
     }
 }
 
-// Integration: This component works with EnhancedAISynthesisCore to generate contextual documentation
+// Integration: This component works with AISynthesisCore to generate contextual documentation
 // Notes: The template system allows for different documentation formats, and quality scoring helps improve documentation
 
 #[cfg(test)]

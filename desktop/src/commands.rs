@@ -4,13 +4,12 @@
 // Dependencies: [secondary-mind-core (for all models and logic), Tauri, WalkDir.]
 use secondary_mind_core::{
     components::{
-        enhanced_analysis_engine::EnhancedAnalysisEngine,
-        enhanced_ai_synthesis_core::{EnhancedAISynthesisCore, ContextBuilder},
+        analysis_engine::AnalysisEngine,
+        ai_synthesis_core::{AISynthesisCore, ContextBuilder},
         search_index_manager::{SearchIndexManager, SearchFilters},
         session_manager::{SessionManager, SessionConfig},
         file_system_watcher::FileSystemWatcher,
         codebase_cartographer::CodebaseCartographer,
-        ai_synthesis_core::AISynthesisCore,
         code_source_controller::CodeSourceController,
         project_configuration_service::ProjectConfigurationService,
         home_directory_manager::HomeDirectoryManager,
@@ -329,7 +328,7 @@ pub async fn enhanced_ai_synthesis(
         }
     }
     
-    let mut ai_core = EnhancedAISynthesisCore::new().map_err(|e| e.to_string())?;
+    let mut ai_core = AISynthesisCore::new().map_err(|e| e.to_string())?;
     let context = request.context.unwrap_or(ContextBuilder {
         current_file: None,
         current_file_content: None,

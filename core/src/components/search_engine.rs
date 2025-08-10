@@ -3,7 +3,7 @@
 // Architecture: Core component that extends basic search with advanced features
 // Dependencies: search_index_manager, symbol_relationship_tracker, regex, serde
 
-use crate::components::search_index_manager::{SearchIndexManager, SearchResult, SearchFilters, MatchType, SearchContext};
+use crate::components::search_index_manager::{SearchIndexManager, SearchFilters, MatchType, SearchContext};
 use crate::components::symbol_relationship_tracker::SymbolRelationshipTracker;
 use crate::model::symbol::{Symbol, SymbolKind};
 use crate::errors::SecondaryMindError;
@@ -15,7 +15,7 @@ use std::time::SystemTime;
 
 /// Configuration for advanced search operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdvancedSearchConfig {
+pub struct SearchConfig {
     /// Maximum number of results to return
     pub max_results: usize,
     /// Enable semantic search
@@ -92,9 +92,9 @@ pub struct SearchQueryContext {
 
 /// Enhanced search result with advanced ranking and context
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdvancedSearchResult {
+pub struct EnhancedSearchResult {
     /// Base search result
-    pub base_result: SearchResult,
+    pub base_result: crate::components::search_index_manager::SearchResult,
     /// Advanced ranking score (0.0 to 1.0)
     pub advanced_score: f64,
     /// Breakdown of ranking factors
@@ -168,13 +168,13 @@ pub struct SavedSearch {
 }
 
 /// Main component for advanced search capabilities
-pub struct AdvancedSearchEngine {
+pub struct SearchEngine {
     /// Basic search index manager
     search_index: SearchIndexManager,
     /// Symbol relationship tracker for semantic search
     relationship_tracker: SymbolRelationshipTracker,
     /// Search configuration
-    config: AdvancedSearchConfig,
+    config: SearchConfig,
     /// Search history
     search_history: VecDeque<SearchHistoryEntry>,
     /// Saved searches
@@ -185,7 +185,7 @@ pub struct AdvancedSearchEngine {
     regex_cache: HashMap<String, Regex>,
 }
 
-impl Default for AdvancedSearchConfig {
+impl Default for SearchConfig {
     fn default() -> Self {
         Self {
             max_results: 100,
@@ -211,9 +211,9 @@ impl Default for RankingWeights {
     }
 }
 
-impl AdvancedSearchEngine {
+impl SearchEngine {
     /// Create a new advanced search engine
-    pub fn new(config: AdvancedSearchConfig) -> Self {
+    pub fn new(config: SearchConfig) -> Self {
         Self {
             search_index: SearchIndexManager::new(),
             relationship_tracker: SymbolRelationshipTracker::new(),
@@ -227,7 +227,7 @@ impl AdvancedSearchEngine {
 
     /// Create with default configuration
     pub fn with_default_config() -> Self {
-        Self::new(AdvancedSearchConfig::default())
+        Self::new(SearchConfig::default())
     }
 
     /// Update the search index with new symbols
@@ -243,7 +243,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Perform an advanced search with multiple strategies
-    pub fn search(&mut self, query: SearchQuery) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    pub fn search(&mut self, query: SearchQuery) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         let _start_time = SystemTime::now();
         
         let results = match query.search_type {
@@ -268,19 +268,19 @@ impl AdvancedSearchEngine {
     }
 
     /// Perform fuzzy search with advanced ranking
-    fn fuzzy_search(&self, query: &SearchQuery) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    fn fuzzy_search(&self, query: &SearchQuery) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         let basic_results = self.search_index.search_symbols(&query.query, &query.filters);
         self.enhance_results(basic_results, query)
     }
 
     /// Perform exact search with advanced ranking
-    fn exact_search(&self, query: &SearchQuery) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    fn exact_search(&self, query: &SearchQuery) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         let basic_results = self.search_index.search_exact(&query.query, &query.filters);
         self.enhance_results(basic_results, query)
     }
 
     /// Perform regex search across files
-    fn regex_search(&self, query: &SearchQuery) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    fn regex_search(&self, query: &SearchQuery) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         // Try to get cached regex or compile new one
         let regex = if let Some(cached_regex) = self.regex_cache.get(&query.query) {
             cached_regex.clone()
@@ -316,7 +316,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Perform semantic search using symbol relationships
-    fn semantic_search(&self, query: &SearchQuery) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    fn semantic_search(&self, query: &SearchQuery) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         if !self.config.enable_semantic_search {
             return self.fuzzy_search(query);
         }
@@ -358,7 +358,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Perform combined search using multiple strategies
-    fn combined_search(&self, query: &SearchQuery) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    fn combined_search(&self, query: &SearchQuery) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         let mut all_results = Vec::new();
         
         // Collect results from different search types
@@ -394,7 +394,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Search in file contents using regex
-    fn search_in_file_contents(&self, _regex: &Regex, _query: &SearchQuery) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    fn search_in_file_contents(&self, _regex: &Regex, _query: &SearchQuery) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         let results = Vec::new();
         
         // This is a simplified implementation - in practice, you'd want to
@@ -405,14 +405,14 @@ impl AdvancedSearchEngine {
     }
 
     /// Find semantically related symbols
-    fn find_semantically_related(&self, symbol_id: &str, query: &SearchQuery) -> Vec<AdvancedSearchResult> {
+    fn find_semantically_related(&self, symbol_id: &str, query: &SearchQuery) -> Vec<EnhancedSearchResult> {
         let mut results = Vec::new();
         
         // Find symbols that depend on this symbol
         let dependents = self.relationship_tracker.get_dependents(symbol_id);
         for dependent in dependents {
             if let Some(symbol) = self.get_symbol_by_id(&dependent) {
-                let search_result = SearchResult {
+                let search_result = crate::components::search_index_manager::SearchResult {
                     symbol: symbol.clone(),
                     relevance_score: 0.6, // Lower score for related symbols
                     match_type: MatchType::Semantic,
@@ -433,7 +433,7 @@ impl AdvancedSearchEngine {
         let dependencies = self.relationship_tracker.get_dependencies(symbol_id);
         for dependency in dependencies {
             if let Some(symbol) = self.get_symbol_by_id(&dependency) {
-                let search_result = SearchResult {
+                let search_result = crate::components::search_index_manager::SearchResult {
                     symbol: symbol.clone(),
                     relevance_score: 0.5, // Even lower score for dependencies
                     match_type: MatchType::Semantic,
@@ -454,7 +454,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Find semantic matches for a query
-    fn find_semantic_matches(&self, query_text: &str, query: &SearchQuery) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    fn find_semantic_matches(&self, query_text: &str, query: &SearchQuery) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         let mut results = Vec::new();
         
         // Use fuzzy matching to find similar symbol names
@@ -471,7 +471,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Enhance basic search results with advanced ranking
-    fn enhance_results(&self, basic_results: Vec<SearchResult>, query: &SearchQuery) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    fn enhance_results(&self, basic_results: Vec<crate::components::search_index_manager::SearchResult>, query: &SearchQuery) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         let mut enhanced_results = Vec::new();
         
         for result in basic_results {
@@ -486,13 +486,13 @@ impl AdvancedSearchEngine {
     }
 
     /// Enhance a single search result with advanced ranking
-    fn enhance_single_result(&self, result: SearchResult, query: &SearchQuery) -> Result<AdvancedSearchResult, SecondaryMindError> {
+    fn enhance_single_result(&self, result: crate::components::search_index_manager::SearchResult, query: &SearchQuery) -> Result<EnhancedSearchResult, SecondaryMindError> {
         let ranking_factors = self.calculate_ranking_factors(&result, query);
         let advanced_score = self.calculate_advanced_score(&result, query, &ranking_factors);
         let semantic_info = self.calculate_semantic_info(&result, query);
         let context_relevance = self.calculate_context_relevance(&result, query);
         
-        Ok(AdvancedSearchResult {
+        Ok(EnhancedSearchResult {
             base_result: result,
             advanced_score,
             ranking_factors,
@@ -502,7 +502,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Calculate ranking factors for a search result
-    fn calculate_ranking_factors(&self, result: &SearchResult, query: &SearchQuery) -> RankingFactors {
+    fn calculate_ranking_factors(&self, result: &crate::components::search_index_manager::SearchResult, query: &SearchQuery) -> RankingFactors {
         let match_score = result.relevance_score;
         
         let usage_score = if let Some(stats) = self.relationship_tracker.get_usage_stats(&result.symbol.identifier) {
@@ -545,7 +545,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Calculate advanced score using ranking factors and weights
-    fn calculate_advanced_score(&self, _result: &SearchResult, _query: &SearchQuery, factors: &RankingFactors) -> f64 {
+    fn calculate_advanced_score(&self, _result: &crate::components::search_index_manager::SearchResult, _query: &SearchQuery, factors: &RankingFactors) -> f64 {
         let weights = &self.config.ranking_weights;
         
         let weighted_score = 
@@ -575,7 +575,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Calculate semantic information for a result
-    fn calculate_semantic_info(&self, result: &SearchResult, _query: &SearchQuery) -> Option<SemanticInfo> {
+    fn calculate_semantic_info(&self, result: &crate::components::search_index_manager::SearchResult, _query: &SearchQuery) -> Option<SemanticInfo> {
         if result.match_type == MatchType::Semantic {
             Some(SemanticInfo {
                 related_symbols: result.context.related_symbols.clone(),
@@ -588,7 +588,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Calculate context relevance for a result
-    fn calculate_context_relevance(&self, result: &SearchResult, query: &SearchQuery) -> f64 {
+    fn calculate_context_relevance(&self, result: &crate::components::search_index_manager::SearchResult, query: &SearchQuery) -> f64 {
         if !self.config.enable_context_ranking {
             return 0.5;
         }
@@ -656,7 +656,7 @@ impl AdvancedSearchEngine {
     }
 
     /// Execute a saved search
-    pub fn execute_saved_search(&mut self, search_id: &str) -> Result<Vec<AdvancedSearchResult>, SecondaryMindError> {
+    pub fn execute_saved_search(&mut self, search_id: &str) -> Result<Vec<EnhancedSearchResult>, SecondaryMindError> {
         // Clone the query to avoid borrowing issues
         let query = if let Some(saved_search) = self.saved_searches.get(search_id) {
             saved_search.query.clone()
@@ -682,12 +682,12 @@ impl AdvancedSearchEngine {
     }
 
     /// Update configuration
-    pub fn update_config(&mut self, config: AdvancedSearchConfig) {
+    pub fn update_config(&mut self, config: SearchConfig) {
         self.config = config;
     }
 
     /// Get current configuration
-    pub fn get_config(&self) -> &AdvancedSearchConfig {
+    pub fn get_config(&self) -> &SearchConfig {
         &self.config
     }
 }
@@ -721,15 +721,15 @@ mod tests {
     }
 
     #[test]
-    fn test_advanced_search_engine_creation() {
-        let engine = AdvancedSearchEngine::with_default_config();
+    fn test_search_engine_creation() {
+        let engine = SearchEngine::with_default_config();
         assert_eq!(engine.config.max_results, 100);
         assert!(engine.config.enable_semantic_search);
     }
 
     #[test]
     fn test_fuzzy_search() {
-        let mut engine = AdvancedSearchEngine::with_default_config();
+        let mut engine = SearchEngine::with_default_config();
         let symbols = vec![
             create_test_symbol("myFunction", SymbolKind::Function, "src/main.rs"),
             create_test_symbol("myOtherFunction", SymbolKind::Function, "src/lib.rs"),
@@ -746,7 +746,7 @@ mod tests {
 
     #[test]
     fn test_exact_search() {
-        let mut engine = AdvancedSearchEngine::with_default_config();
+        let mut engine = SearchEngine::with_default_config();
         let symbols = vec![
             create_test_symbol("exactMatch", SymbolKind::Function, "src/main.rs"),
         ];
@@ -762,7 +762,7 @@ mod tests {
 
     #[test]
     fn test_search_history() {
-        let mut engine = AdvancedSearchEngine::with_default_config();
+        let mut engine = SearchEngine::with_default_config();
         let symbols = vec![
             create_test_symbol("testFunction", SymbolKind::Function, "src/main.rs"),
         ];
@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     fn test_saved_search() {
-        let mut engine = AdvancedSearchEngine::with_default_config();
+        let mut engine = SearchEngine::with_default_config();
         
         let saved_search = SavedSearch {
             id: "test-search".to_string(),
@@ -799,7 +799,7 @@ mod tests {
 
     #[test]
     fn test_ranking_factors() {
-        let engine = AdvancedSearchEngine::with_default_config();
+        let engine = SearchEngine::with_default_config();
         let symbol = create_test_symbol("testFunction", SymbolKind::Function, "src/main.rs");
         
         let result = SearchResult {
@@ -822,7 +822,7 @@ mod tests {
 
     #[test]
     fn test_symbol_importance_calculation() {
-        let engine = AdvancedSearchEngine::with_default_config();
+        let engine = SearchEngine::with_default_config();
         
         let class_symbol = create_test_symbol("MyClass", SymbolKind::TSClass, "src/main.ts");
         let function_symbol = create_test_symbol("myFunction", SymbolKind::Function, "src/main.rs");

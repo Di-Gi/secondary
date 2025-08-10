@@ -14,5 +14,5 @@ pub use components::{
 };
 
 // Re-export enhanced project config types
-pub use components::enhanced_project_config::*;
+pub use components::project_config::*;
 pub use model::session::{ProjectSession, OpenFile, Bookmark, ChatMessage, WorkspaceLayout};

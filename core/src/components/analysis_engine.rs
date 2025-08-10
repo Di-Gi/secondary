@@ -35,7 +35,7 @@ pub struct FileAnalysisResult {
     pub dependencies: Vec<PathBuf>,
 }
 
-pub struct EnhancedAnalysisEngine {
+pub struct AnalysisEngine {
     cache_manager: CacheManager,
     cartographer: CodebaseCartographer,
     file_watcher: Option<FileSystemWatcher>,
@@ -43,7 +43,7 @@ pub struct EnhancedAnalysisEngine {
     watched_projects: HashMap<PathBuf, SystemTime>,
 }
 
-impl EnhancedAnalysisEngine {
+impl AnalysisEngine {
     pub fn new() -> Result<Self> {
         let cache_manager = CacheManager::new()?;
         let cartographer = CodebaseCartographer::new();
@@ -370,7 +370,7 @@ impl EnhancedAnalysisEngine {
     }
 }
 
-impl Default for EnhancedAnalysisEngine {
+impl Default for AnalysisEngine {
     fn default() -> Self {
         Self::new().expect("Failed to create EnhancedAnalysisEngine")
     }

@@ -3,7 +3,7 @@
 // Architecture: Handles file and project-level caching with LRU eviction strategy
 // Dependencies: LRU cache, file system, serialization
 
-use crate::components::enhanced_analysis_engine::{AnalysisResult, FileAnalysisResult};
+use crate::components::analysis_engine::{AnalysisResult, FileAnalysisResult};
 use crate::model::symbol::Symbol;
 use crate::errors::SecondaryMindError;
 use std::path::{Path, PathBuf};

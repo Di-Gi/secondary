@@ -3,7 +3,7 @@
 // Architecture: Analyzes code for improvement opportunities and generates contextual suggestions
 // Dependencies: crate::{errors, model::symbol, components::enhanced_ai_synthesis_core}, serde, std::collections::HashMap
 
-use crate::components::enhanced_ai_synthesis_core::{EnhancedAISynthesisCore, ContextBuilder, AIResponse};
+use crate::components::ai_synthesis_core::{AISynthesisCore, ContextBuilder, AIResponse};
 use crate::errors::SecondaryMindError;
 use crate::model::symbol::{Symbol, SymbolLocation, SymbolKind};
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 /// Code suggestion system that analyzes code and provides improvement recommendations
 pub struct CodeSuggestionSystem {
-    ai_core: EnhancedAISynthesisCore,
+    ai_core: AISynthesisCore,
     quality_analyzer: CodeQualityAnalyzer,
 }
 
@@ -121,7 +121,7 @@ pub struct SuggestionApplication {
 impl CodeSuggestionSystem {
     /// Creates a new code suggestion system
     pub fn new() -> Result<Self, SecondaryMindError> {
-        let ai_core = EnhancedAISynthesisCore::new()?;
+        let ai_core = AISynthesisCore::new()?;
         let quality_analyzer = CodeQualityAnalyzer::new();
         
         Ok(Self {
@@ -166,7 +166,7 @@ impl CodeSuggestionSystem {
         issue: &QualityIssue,
     ) -> Result<Option<CodeSuggestion>, SecondaryMindError> {
         // Build context for AI query
-        let selection_range = crate::components::enhanced_ai_synthesis_core::SelectionRange {
+        let selection_range = crate::components::ai_synthesis_core::SelectionRange {
             start_line: issue.location.start_line,
             start_column: issue.location.start_column,
             end_line: issue.location.end_line,
@@ -1072,7 +1072,7 @@ impl std::fmt::Display for QualityIssueType {
     }
 }
 
-// Integration: This component integrates with the EnhancedAISynthesisCore for AI-powered suggestions
+// Integration: This component integrates with the AISynthesisCore for AI-powered suggestions
 // and provides structured code analysis with ranking and application capabilities
 // Notes: The quality analyzer uses heuristic-based analysis combined with AI suggestions for comprehensive code improvement recommendations
 

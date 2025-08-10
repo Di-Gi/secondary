@@ -6,19 +6,18 @@ pub mod code_source_controller;
 pub mod codebase_cartographer;
 pub mod command_bus;
 pub mod ai_synthesis_core;
-pub mod enhanced_ai_synthesis_core;
 pub mod home_directory_manager;
 pub mod project_configuration_service;
-pub mod enhanced_project_config;
+pub mod project_config;
 pub mod parsers; // New module for language-specific parsers
 
-// Enhanced infrastructure components
-pub mod enhanced_analysis_engine;
+// Infrastructure components
+pub mod analysis_engine;
 pub mod cache_manager;
 pub mod file_system_watcher;
 pub mod search_index_manager;
 pub mod symbol_relationship_tracker;
-pub mod advanced_search;
+pub mod search_engine;
 pub mod code_suggestion_system;
 pub mod documentation_generator;
 pub mod pattern_recognition_system;
@@ -28,7 +27,7 @@ pub mod session_manager;
 pub mod error_recovery_manager;
 pub mod error_logger;
 pub mod error_reporter;
-pub mod enhanced_error_system;
+pub mod error_system;
 
 // Operation management
 pub mod operation_manager;

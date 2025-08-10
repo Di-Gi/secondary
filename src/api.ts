@@ -360,7 +360,7 @@ export const api = {
 
   // These commands are not implemented in the provided backend.
   // They are stubbed here to prevent crashes and log warnings.
-  async deleteSession(projectId: string): Promise<void> {
+  async deleteSession(_projectId: string): Promise<void> {
     console.warn(`[API] The 'delete_session' command is not implemented in the backend.`);
     if (!isTauri()) {
         console.log('🔧 Development mode: Session deletion simulated');

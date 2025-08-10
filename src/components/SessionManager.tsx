@@ -7,6 +7,7 @@ import React, { useEffect } from 'react';
 import { useSessionStore } from '../store/sessionStore';
 import { useSessionRestore, useWorkspaceRestore, useSessionCleanup } from '../hooks/useSessionRestore';
 import { useAutoSave } from '../store/sessionStore';
+import { useAppStore } from '../store/appStore';
 
 interface SessionManagerProps {
   children: React.ReactNode;
@@ -125,8 +126,14 @@ export const SessionList: React.FC = () => {
   }, [listSessions]);
 
   const handleLoadSession = async (projectId: string) => {
+    const { currentProject } = useAppStore.getState();
+    if (!currentProject) {
+      console.error('No current project available');
+      return;
+    }
+    
     try {
-      await loadSession(projectId);
+      await loadSession(projectId, currentProject.project_path);
     } catch (error) {
       console.error('Failed to load session:', error);
     }

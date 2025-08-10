@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { open } from '@tauri-apps/api/dialog';
 import { useAppStore } from '../store/appStore';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { 
   FolderOpen, 
@@ -16,8 +16,7 @@ import {
   Zap, 
   Clock,
   FileText,
-  Star,
-  MoreHorizontal,
+
   Trash2,
   Calendar,
   Plus,

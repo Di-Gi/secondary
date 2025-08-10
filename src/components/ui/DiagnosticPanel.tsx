@@ -150,7 +150,7 @@ export const DiagnosticPanel: React.FC<DiagnosticPanelProps> = ({
     onClose,
     autoRefresh = true,
     refreshInterval = 30,
-    showAdvanced = false,
+    showAdvanced: _showAdvanced = false,
 }) => {
     const [diagnostics, setDiagnostics] = useState<SystemDiagnostics | null>(null);
     const [loading, setLoading] = useState(false);

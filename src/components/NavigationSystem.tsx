@@ -17,8 +17,7 @@ import {
   Folder,
   File,
   X,
-  Tag,
-  Filter
+
 } from 'lucide-react';
 
 export interface NavigationEntry {

@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
 import { Button } from './ui/button';
-import { SymbolInterface } from './SymbolInterface';
+import { SymbolExplorer } from './SymbolExplorer';
 import { AIChatInterface } from './AIChatInterface';
 import { NotesInterface } from './NotesInterface';
 import { NavigationSystem, NavigationEntry } from './NavigationSystem'; // Import NavigationEntry type
@@ -105,7 +105,7 @@ export function ProjectWorkspace() {
 
         {/* Unified Symbol Interface */}
         <div className="flex-1 overflow-hidden">
-          <SymbolInterface 
+          <SymbolExplorer 
             symbols={currentProject.symbols}
             onSymbolSelect={handleSymbolSelect}
             onSymbolNavigate={handleNavigateToSymbol}

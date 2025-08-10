@@ -421,6 +421,232 @@ export const api = {
       console.log('🔧 Development mode: File watching simulated');
     }
   },
+
+  // ============================================================================
+  // Enhanced Navigation API Functions
+  // ============================================================================
+
+  // Symbol relationship analysis
+  async analyzeSymbolRelationships(symbolId: string, depth: number = 2): Promise<any> {
+    if (isTauri()) {
+      try {
+        return await invoke('analyze_symbol_relationships', { symbolId, depth });
+      } catch (error) {
+        console.error('Failed to analyze symbol relationships:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock symbol relationships');
+      await new Promise(resolve => setTimeout(resolve, 800));
+      return {
+        centerSymbol: { identifier: symbolId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
+        relationships: [
+          { type: 'calls', target: { identifier: 'helperFunction', kind: 'TSFunction' }, strength: 0.8 },
+          { type: 'references', target: { identifier: 'UserInterface', kind: 'TSInterface' }, strength: 0.6 }
+        ]
+      };
+    }
+  },
+
+  // File structure analysis for minimap
+  async analyzeFileStructure(filePath: string): Promise<any> {
+    if (isTauri()) {
+      try {
+        return await invoke('analyze_file_structure', { filePath });
+      } catch (error) {
+        console.error('Failed to analyze file structure:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock file structure');
+      await new Promise(resolve => setTimeout(resolve, 400));
+      return {
+        outline: [
+          { name: 'imports', type: 'section', startLine: 1, endLine: 5, children: [] },
+          { name: 'UserService', type: 'class', startLine: 7, endLine: 45, children: [
+            { name: 'constructor', type: 'method', startLine: 8, endLine: 12, children: [] },
+            { name: 'authenticate', type: 'method', startLine: 14, endLine: 25, children: [] }
+          ]}
+        ],
+        symbolDensity: { regions: [{ startLine: 1, endLine: 50, density: 0.3, symbolTypes: new Map([['class', 1], ['method', 2]]) }] }
+      };
+    }
+  },
+
+  // Navigation history management
+  async saveNavigationHistory(projectPath: string, history: any): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('save_navigation_history', { projectPath, history });
+      } catch (error) {
+        console.error('Failed to save navigation history:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Navigation history save simulated');
+    }
+  },
+
+  async loadNavigationHistory(projectPath: string): Promise<any> {
+    if (isTauri()) {
+      try {
+        return await invoke('load_navigation_history', { projectPath });
+      } catch (error) {
+        console.error('Failed to load navigation history:', error);
+        return null;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock navigation history');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return {
+        entries: [],
+        sessions: [],
+        currentIndex: -1
+      };
+    }
+  },
+
+  // File tree with enhanced metadata
+  async getEnhancedFileTree(directoryPath: string, options?: any): Promise<any> {
+    if (isTauri()) {
+      try {
+        return await invoke('get_enhanced_file_tree', { directoryPath, options });
+      } catch (error) {
+        console.error('Failed to get enhanced file tree:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock enhanced file tree');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return {
+        nodes: [
+          {
+            id: 'src',
+            name: 'src',
+            path: '/src',
+            type: 'directory',
+            children: [
+              {
+                id: 'src/components',
+                name: 'components',
+                path: '/src/components',
+                type: 'directory',
+                metadata: { symbolCount: 25, lastModified: new Date().toISOString() }
+              }
+            ]
+          }
+        ]
+      };
+    }
+  },
+
+  // Symbol usage analysis
+  async analyzeSymbolUsage(symbolId: string): Promise<any> {
+    if (isTauri()) {
+      try {
+        return await invoke('analyze_symbol_usage', { symbolId });
+      } catch (error) {
+        console.error('Failed to analyze symbol usage:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock symbol usage');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return {
+        referenceCount: 12,
+        callCount: 8,
+        lastUsed: new Date().toISOString(),
+        usageFrequency: 0.75,
+        hotspots: [
+          { filePath: '/src/auth.ts', position: { line: 23, column: 10 } },
+          { filePath: '/src/user.ts', position: { line: 45, column: 5 } }
+        ]
+      };
+    }
+  },
+
+  // Navigation session management (enhanced)
+  async saveNavigationSession(projectPath: string, session: any): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('save_navigation_session', { projectPath, session });
+      } catch (error) {
+        console.error('Failed to save navigation session:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Navigation session save simulated');
+    }
+  },
+
+  async loadNavigationSession(projectPath: string, sessionId?: string): Promise<any> {
+    if (isTauri()) {
+      try {
+        return await invoke('load_navigation_session', { projectPath, sessionId });
+      } catch (error) {
+        console.error('Failed to load navigation session:', error);
+        return null;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock navigation session');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return null;
+    }
+  },
+
+  async listNavigationSessions(projectPath: string): Promise<any[]> {
+    if (isTauri()) {
+      try {
+        return await invoke('list_navigation_sessions', { projectPath });
+      } catch (error) {
+        console.error('Failed to list navigation sessions:', error);
+        return [];
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock navigation sessions list');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return [];
+    }
+  },
+
+  // Performance monitoring
+  async getNavigationMetrics(): Promise<any> {
+    if (isTauri()) {
+      try {
+        return await invoke('get_navigation_metrics');
+      } catch (error) {
+        console.error('Failed to get navigation metrics:', error);
+        return null;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock navigation metrics');
+      return {
+        navigationResponseTime: 45,
+        memoryUsage: 128,
+        cacheHitRate: 0.85,
+        backgroundProcessingTime: 120
+      };
+    }
+  },
+
+  // Git integration for navigation
+  async getFileGitStatus(filePath: string): Promise<any> {
+    if (isTauri()) {
+      try {
+        return await invoke('get_file_git_status', { filePath });
+      } catch (error) {
+        console.error('Failed to get file git status:', error);
+        return null;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock file git status');
+      return {
+        status: 'modified',
+        branch: 'main',
+        lastCommit: new Date(Date.now() - 86400000).toISOString()
+      };
+    }
+  },
 };
 
 // Utility to check current mode

@@ -5,6 +5,13 @@
 
 import { create } from 'zustand';
 import { api, AnalysisResult, GitStatus, RecentProjects, ProjectNote, SearchRequest, SearchResult, AIRequest, AIResponse, isDevelopmentMode } from '../api';
+import { 
+  NavigationLocation, 
+  NavigationSession, 
+  NavigationHistory, 
+  NavigationContext,
+  PerformanceMetrics 
+} from '../types/navigation';
 
 interface AppState {
   // Current project state
@@ -30,6 +37,14 @@ interface AppState {
   // Session state
   currentSession: any;
   isSessionLoading: boolean;
+  
+  // Enhanced Navigation state
+  currentLocation: NavigationLocation | null;
+  navigationHistory: NavigationHistory | null;
+  navigationSessions: NavigationSession[];
+  activeNavigationSession: NavigationSession | null;
+  navigationContext: NavigationContext | null;
+  navigationMetrics: PerformanceMetrics | null;
   
   // UI state
   isLoading: boolean;
@@ -57,6 +72,18 @@ interface AppState {
   saveSession: (sessionData: any) => Promise<void>;
   loadSession: () => Promise<void>;
   
+  // Enhanced Navigation actions
+  setCurrentLocation: (location: NavigationLocation) => void;
+  addToNavigationHistory: (location: NavigationLocation) => void;
+  loadNavigationHistory: () => Promise<void>;
+  saveNavigationHistory: () => Promise<void>;
+  createNavigationSession: (name: string, description?: string) => NavigationSession;
+  saveNavigationSession: (session: NavigationSession) => Promise<void>;
+  loadNavigationSession: (sessionId?: string) => Promise<void>;
+  setActiveNavigationSession: (session: NavigationSession) => void;
+  updateNavigationContext: (context: Partial<NavigationContext>) => void;
+  getNavigationMetrics: () => Promise<void>;
+  
   // Note actions
   loadProjectNotes: (projectPath: string) => Promise<void>;
   saveNote: (note: ProjectNote) => Promise<void>;
@@ -78,6 +105,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   isAIProcessing: false,
   currentSession: null,
   isSessionLoading: false,
+  
+  // Enhanced Navigation initial state
+  currentLocation: null,
+  navigationHistory: null,
+  navigationSessions: [],
+  activeNavigationSession: null,
+  navigationContext: null,
+  navigationMetrics: null,
+  
   isLoading: false,
   error: null,
 
@@ -326,6 +362,215 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error('Failed to load session:', error);
       set({ isSessionLoading: false });
+    }
+  },
+
+  // ============================================================================
+  // Enhanced Navigation Actions
+  // ============================================================================
+
+  // Set current navigation location
+  setCurrentLocation: (location: NavigationLocation) => {
+    set({ currentLocation: location });
+    get().addToNavigationHistory(location);
+  },
+
+  // Add location to navigation history
+  addToNavigationHistory: (location: NavigationLocation) => {
+    set(state => {
+      const currentHistory = state.navigationHistory || {
+        entries: [],
+        currentIndex: -1,
+        sessions: [],
+        maxEntries: 100,
+        groupingStrategy: 'time-based'
+      };
+
+      const newEntry = {
+        id: `entry-${Date.now()}`,
+        location,
+        action: 'navigate' as const,
+        duration: 0,
+        sessionId: state.activeNavigationSession?.id || 'default',
+        metadata: {
+          trigger: 'click' as const,
+          userAction: true,
+          confidence: 1.0,
+          relatedEntries: [],
+          tags: []
+        }
+      };
+
+      const updatedEntries = [...currentHistory.entries, newEntry];
+      
+      // Keep only the last maxEntries
+      if (updatedEntries.length > currentHistory.maxEntries) {
+        updatedEntries.splice(0, updatedEntries.length - currentHistory.maxEntries);
+      }
+
+      return {
+        navigationHistory: {
+          ...currentHistory,
+          entries: updatedEntries,
+          currentIndex: updatedEntries.length - 1
+        }
+      };
+    });
+  },
+
+  // Load navigation history from storage
+  loadNavigationHistory: async () => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    try {
+      const history = await api.loadNavigationHistory(currentProject.project_path);
+      if (history) {
+        set({ navigationHistory: history });
+      }
+    } catch (error) {
+      console.error('Failed to load navigation history:', error);
+    }
+  },
+
+  // Save navigation history to storage
+  saveNavigationHistory: async () => {
+    const { currentProject, navigationHistory } = get();
+    if (!currentProject || !navigationHistory) return;
+
+    try {
+      await api.saveNavigationHistory(currentProject.project_path, navigationHistory);
+    } catch (error) {
+      console.error('Failed to save navigation history:', error);
+    }
+  },
+
+  // Create a new navigation session
+  createNavigationSession: (name: string, description?: string) => {
+    const { currentProject, navigationContext } = get();
+    
+    const session: NavigationSession = {
+      id: `session-${Date.now()}`,
+      name,
+      description,
+      locations: [],
+      layout: {
+        panelSizes: new Map([
+          ['minimap', 200],
+          ['fileTree', 250],
+          ['relationshipGraph', 300]
+        ]),
+        visiblePanels: ['minimap', 'fileTree', 'breadcrumbs'],
+        minimapSettings: {
+          zoomLevel: 1,
+          showSymbolTypes: true,
+          showComplexity: false,
+          autoUpdate: true,
+          renderQuality: 'medium',
+          maxFileSize: 1024 * 1024
+        },
+        treeSettings: {
+          showHiddenFiles: false,
+          showGitStatus: true,
+          showFileIcons: true,
+          sortBy: 'name',
+          sortOrder: 'asc',
+          virtualScrolling: true,
+          previewOnHover: true
+        },
+        graphSettings: {
+          defaultLayout: 'force-directed',
+          nodeSize: 20,
+          edgeWidth: 2,
+          animationSpeed: 1000,
+          showLabels: true,
+          clusterNodes: false,
+          maxNodes: 100
+        },
+        breadcrumbSettings: {
+          maxSegments: 8,
+          showFileExtensions: true,
+          showSymbolTypes: true,
+          truncationStrategy: 'intelligent',
+          showTooltips: true
+        }
+      },
+      createdAt: new Date(),
+      lastAccessed: new Date(),
+      metadata: {
+        projectPath: currentProject?.project_path || '',
+        totalTimeSpent: 0,
+        locationCount: 0,
+        tags: [],
+        isShared: false,
+        version: 1
+      }
+    };
+
+    set(state => ({
+      navigationSessions: [...state.navigationSessions, session]
+    }));
+
+    return session;
+  },
+
+  // Save navigation session
+  saveNavigationSession: async (session: NavigationSession) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    try {
+      await api.saveNavigationSession(currentProject.project_path, session);
+      
+      set(state => ({
+        navigationSessions: state.navigationSessions.map(s => 
+          s.id === session.id ? session : s
+        )
+      }));
+    } catch (error) {
+      console.error('Failed to save navigation session:', error);
+      throw error;
+    }
+  },
+
+  // Load navigation session
+  loadNavigationSession: async (sessionId?: string) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    try {
+      const session = await api.loadNavigationSession(currentProject.project_path, sessionId);
+      if (session) {
+        set({ activeNavigationSession: session });
+      }
+    } catch (error) {
+      console.error('Failed to load navigation session:', error);
+    }
+  },
+
+  // Set active navigation session
+  setActiveNavigationSession: (session: NavigationSession) => {
+    set({ activeNavigationSession: session });
+  },
+
+  // Update navigation context
+  updateNavigationContext: (context: Partial<NavigationContext>) => {
+    set(state => ({
+      navigationContext: state.navigationContext 
+        ? { ...state.navigationContext, ...context }
+        : context as NavigationContext
+    }));
+  },
+
+  // Get navigation performance metrics
+  getNavigationMetrics: async () => {
+    try {
+      const metrics = await api.getNavigationMetrics();
+      if (metrics) {
+        set({ navigationMetrics: metrics });
+      }
+    } catch (error) {
+      console.error('Failed to get navigation metrics:', error);
     }
   },
 }));

@@ -9,7 +9,8 @@ import { Button } from './ui/button';
 import { SymbolExplorer } from './SymbolExplorer';
 import { AIChatInterface } from './AIChatInterface';
 import { NotesInterface } from './NotesInterface';
-import { NavigationSystem, NavigationEntry } from './NavigationSystem'; // Import NavigationEntry type
+import { NavigationInterface } from './navigation/NavigationInterface';
+import { NavigationLocation } from '../types/navigation';
 import { SessionManager } from './SessionManager';
 import { GitStatusDisplay } from './GitStatusDisplay';
 import { ArrowLeft, FolderOpen, Code, Bot, BookMarked, Navigation } from 'lucide-react';
@@ -19,8 +20,8 @@ export function ProjectWorkspace() {
   const { currentProject, clearProject, gitStatus, loadSession } = useAppStore();
   const [activeTab, setActiveTab] = useState<'chat' | 'notes' | 'navigation'>('chat');
 
-  // --- FIX: Add state to manage the current navigation location ---
-  const [currentLocation, setCurrentLocation] = useState<NavigationEntry | undefined>();
+  // Enhanced navigation state
+  const [currentLocation, setCurrentLocation] = useState<NavigationLocation | undefined>();
 
   // Load session when component mounts
   useEffect(() => {
@@ -39,27 +40,40 @@ export function ProjectWorkspace() {
     // This could be used for showing symbol details in a preview panel
   };
 
-  // --- FIX: Handler to update the current location when a symbol is selected for navigation ---
+  // Handler to update the current location when a symbol is selected for navigation
   const handleNavigateToSymbol = (symbol: Symbol) => {
-    const newLocation: NavigationEntry = {
+    const newLocation: NavigationLocation = {
       id: `nav-${symbol.identifier}-${symbol.location.line}-${Date.now()}`,
-      symbol: symbol,
       filePath: symbol.location.path,
-      line: symbol.location.line,
-      column: symbol.location.column,
-      timestamp: Date.now(),
-      title: symbol.identifier,
+      position: {
+        line: symbol.location.line,
+        column: symbol.location.column
+      },
+      symbol: symbol,
+      context: {
+        projectPath: currentProject.project_path,
+        breadcrumbs: [],
+        relatedSymbols: []
+      },
+      timestamp: new Date(),
+      metadata: {
+        title: symbol.identifier,
+        description: `${symbol.kind} in ${symbol.location.path}`,
+        tags: [symbol.kind.toLowerCase()],
+        visitCount: 1,
+        lastAccessed: new Date(),
+        isBookmarked: false,
+        isFavorite: false
+      }
     };
     setCurrentLocation(newLocation);
-    // In a real editor integration, this would also open the file and jump to the line.
     console.log("Navigating to:", newLocation);
   };
 
-  // --- FIX: Handler for when the user clicks Back/Forward in the NavigationSystem ---
-  const handleNavigation = (entry: NavigationEntry) => {
-    setCurrentLocation(entry);
-    // Again, this would trigger the editor to show the file/line.
-    console.log("Navigated via history to:", entry);
+  // Handler for navigation location changes
+  const handleLocationChange = (location: NavigationLocation) => {
+    setCurrentLocation(location);
+    console.log("Navigated to:", location);
   };
 
   return (
@@ -154,11 +168,12 @@ export function ProjectWorkspace() {
         <div className="flex-1 bg-gray-50">
           {activeTab === 'chat' && <AIChatInterface />}
           {activeTab === 'notes' && <NotesInterface />}
-          {/* --- FIX: Pass the required props to the NavigationSystem --- */}
           {activeTab === 'navigation' && (
-            <NavigationSystem
+            <NavigationInterface
               currentLocation={currentLocation}
-              onNavigate={handleNavigation}
+              onLocationChange={handleLocationChange}
+              onSymbolSelect={handleSymbolSelect}
+              className="h-full p-4"
             />
           )}
         </div>

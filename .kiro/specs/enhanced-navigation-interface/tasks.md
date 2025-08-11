@@ -45,7 +45,11 @@
 - [ ] 3. Build visual minimap component
 
 
-- [-] 3.1 Create minimap canvas renderer
+
+
+- [x] 3.1 Create minimap canvas renderer
+
+
 
   - Create MinimapComponent using React + Canvas API for code structure visualization
   - Implement symbol density calculation algorithms using existing Symbol types
@@ -53,14 +57,22 @@
   - Write unit tests for rendering logic using existing test patterns
   - _Requirements: 1.1, 1.2, 1.6_
 
-- [ ] 3.2 Add minimap interactivity
+- [x] 3.2 Add minimap interactivity
+
+
+
   - Implement click-to-navigate functionality
   - Add hover tooltips with contextual information
   - Create current location highlighting system
   - Write integration tests for minimap interactions
   - _Requirements: 1.3, 1.4, 1.2_
 
-- [ ] 3.3 Implement real-time minimap updates
+- [x] 3.3 Implement real-time minimap updates
+
+
+
+
+
   - Add file content change detection
   - Implement incremental minimap updates
   - Create debounced update mechanism for performance

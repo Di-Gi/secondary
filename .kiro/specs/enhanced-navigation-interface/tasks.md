@@ -112,22 +112,33 @@
   - Write tests for nested structure navigation
   - _Requirements: 2.4_
 
-- [ ] 5. Build symbol relationship visualization
-- [ ] 5.1 Create relationship graph component
+- [x] 5. Build symbol relationship visualization
+
+
+
+
+
+- [x] 5.1 Create relationship graph component
+
+
   - Add D3.js dependency and implement force-directed graph layout
   - Create SymbolRelationshipGraph component with symbol node and relationship edge rendering
   - Add graph interaction handlers (pan, zoom, select) using React patterns
   - Write unit tests for graph component
   - _Requirements: 3.1, 3.3_
 
-- [ ] 5.2 Implement relationship type visualization
+- [x] 5.2 Implement relationship type visualization
+
+
   - Create visual styles for different relationship types
   - Add hover information for relationship connections
   - Implement relationship type filtering system
   - Write tests for relationship visualization
   - _Requirements: 3.2, 3.4, 3.5_
 
-- [ ] 5.3 Add graph navigation and expansion
+- [x] 5.3 Add graph navigation and expansion
+
+
   - Implement node collapse/expand functionality
   - Create relationship category filtering
   - Add navigation to related symbols

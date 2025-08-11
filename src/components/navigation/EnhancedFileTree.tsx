@@ -2,7 +2,7 @@
 // Purpose: Rich file browser with contextual information and preview capabilities
 // Will be implemented in task 7.1
 
-import React from 'react';
+// import React from 'react'; // Will be used when component is implemented
 import { FileTreeNode } from '../../types/navigation';
 
 export interface EnhancedFileTreeProps {

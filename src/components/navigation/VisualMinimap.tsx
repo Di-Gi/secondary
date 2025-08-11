@@ -2,7 +2,7 @@
 // Purpose: Provides a visual representation of code structure with interactive navigation
 // Will be implemented in task 3.1
 
-import React from 'react';
+// import React from 'react'; // Will be used when component is implemented
 import { MinimapData, CodeLocation } from '../../types/navigation';
 
 export interface VisualMinimapProps {

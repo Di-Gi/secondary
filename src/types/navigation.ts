@@ -789,6 +789,329 @@ export interface MinimapSettings {
 }
 
 // ============================================================================
+// Validation Functions
+// ============================================================================
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export const validateNavigationLocation = (location: any): ValidationResult => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!location) {
+    errors.push('NavigationLocation is required');
+    return { isValid: false, errors, warnings };
+  }
+
+  if (!location.id || typeof location.id !== 'string') {
+    errors.push('NavigationLocation.id must be a non-empty string');
+  }
+
+  if (!location.filePath || typeof location.filePath !== 'string') {
+    errors.push('NavigationLocation.filePath must be a non-empty string');
+  }
+
+  if (!location.position || typeof location.position !== 'object') {
+    errors.push('NavigationLocation.position is required');
+  } else {
+    if (typeof location.position.line !== 'number' || location.position.line < 0) {
+      errors.push('NavigationLocation.position.line must be a non-negative number');
+    }
+    if (typeof location.position.column !== 'number' || location.position.column < 0) {
+      errors.push('NavigationLocation.position.column must be a non-negative number');
+    }
+  }
+
+  if (!location.context || typeof location.context !== 'object') {
+    errors.push('NavigationLocation.context is required');
+  }
+
+  if (!location.timestamp || !(location.timestamp instanceof Date)) {
+    errors.push('NavigationLocation.timestamp must be a valid Date');
+  }
+
+  if (!location.metadata || typeof location.metadata !== 'object') {
+    errors.push('NavigationLocation.metadata is required');
+  }
+
+  return { isValid: errors.length === 0, errors, warnings };
+};
+
+export const validateNavigationSession = (session: any): ValidationResult => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!session) {
+    errors.push('NavigationSession is required');
+    return { isValid: false, errors, warnings };
+  }
+
+  if (!session.id || typeof session.id !== 'string') {
+    errors.push('NavigationSession.id must be a non-empty string');
+  }
+
+  if (!session.name || typeof session.name !== 'string') {
+    errors.push('NavigationSession.name must be a non-empty string');
+  }
+
+  if (!Array.isArray(session.locations)) {
+    errors.push('NavigationSession.locations must be an array');
+  } else {
+    session.locations.forEach((location: any, index: number) => {
+      const locationValidation = validateNavigationLocation(location);
+      if (!locationValidation.isValid) {
+        errors.push(`NavigationSession.locations[${index}]: ${locationValidation.errors.join(', ')}`);
+      }
+    });
+  }
+
+  if (!session.layout || typeof session.layout !== 'object') {
+    errors.push('NavigationSession.layout is required');
+  }
+
+  if (!session.createdAt || !(session.createdAt instanceof Date)) {
+    errors.push('NavigationSession.createdAt must be a valid Date');
+  }
+
+  if (!session.lastAccessed || !(session.lastAccessed instanceof Date)) {
+    errors.push('NavigationSession.lastAccessed must be a valid Date');
+  }
+
+  if (!session.metadata || typeof session.metadata !== 'object') {
+    errors.push('NavigationSession.metadata is required');
+  }
+
+  return { isValid: errors.length === 0, errors, warnings };
+};
+
+export const validateSymbol = (symbol: any): ValidationResult => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!symbol) {
+    errors.push('Symbol is required');
+    return { isValid: false, errors, warnings };
+  }
+
+  if (!symbol.identifier || typeof symbol.identifier !== 'string') {
+    errors.push('Symbol.identifier must be a non-empty string');
+  }
+
+  const validKinds = [
+    'TSFunction', 'TSClass', 'TSInterface',
+    'Struct', 'Enum', 'Trait', 'Function', 'Impl', 'Module', 'Macro',
+    'Unknown'
+  ];
+
+  if (!symbol.kind || !validKinds.includes(symbol.kind)) {
+    errors.push(`Symbol.kind must be one of: ${validKinds.join(', ')}`);
+  }
+
+  if (!symbol.location || typeof symbol.location !== 'object') {
+    errors.push('Symbol.location is required');
+  } else {
+    if (!symbol.location.path || typeof symbol.location.path !== 'string') {
+      errors.push('Symbol.location.path must be a non-empty string');
+    }
+    if (typeof symbol.location.line !== 'number' || symbol.location.line < 0) {
+      errors.push('Symbol.location.line must be a non-negative number');
+    }
+    if (typeof symbol.location.column !== 'number' || symbol.location.column < 0) {
+      errors.push('Symbol.location.column must be a non-negative number');
+    }
+  }
+
+  return { isValid: errors.length === 0, errors, warnings };
+};
+
+export const validateRelationship = (relationship: any): ValidationResult => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!relationship) {
+    errors.push('Relationship is required');
+    return { isValid: false, errors, warnings };
+  }
+
+  if (!relationship.id || typeof relationship.id !== 'string') {
+    errors.push('Relationship.id must be a non-empty string');
+  }
+
+  const validTypes: RelationshipType[] = [
+    'calls', 'inherits', 'implements', 'imports', 'exports', 'references',
+    'defines', 'extends', 'uses', 'contains', 'overrides', 'instantiates'
+  ];
+
+  if (!relationship.type || !validTypes.includes(relationship.type)) {
+    errors.push(`Relationship.type must be one of: ${validTypes.join(', ')}`);
+  }
+
+  if (!relationship.source) {
+    errors.push('Relationship.source is required');
+  } else {
+    const sourceValidation = validateSymbol(relationship.source);
+    if (!sourceValidation.isValid) {
+      errors.push(`Relationship.source: ${sourceValidation.errors.join(', ')}`);
+    }
+  }
+
+  if (!relationship.target) {
+    errors.push('Relationship.target is required');
+  } else {
+    const targetValidation = validateSymbol(relationship.target);
+    if (!targetValidation.isValid) {
+      errors.push(`Relationship.target: ${targetValidation.errors.join(', ')}`);
+    }
+  }
+
+  if (typeof relationship.strength !== 'number' || relationship.strength < 0 || relationship.strength > 1) {
+    errors.push('Relationship.strength must be a number between 0 and 1');
+  }
+
+  if (!relationship.metadata || typeof relationship.metadata !== 'object') {
+    errors.push('Relationship.metadata is required');
+  }
+
+  if (typeof relationship.bidirectional !== 'boolean') {
+    errors.push('Relationship.bidirectional must be a boolean');
+  }
+
+  return { isValid: errors.length === 0, errors, warnings };
+};
+
+// Factory functions for creating valid instances
+export const createNavigationLocation = (
+  filePath: string,
+  position: Position,
+  context: NavigationContext,
+  metadata?: Partial<LocationMetadata>
+): NavigationLocation => {
+  return {
+    id: `location-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    filePath,
+    position,
+    context,
+    timestamp: new Date(),
+    metadata: {
+      title: filePath.split('/').pop() || filePath,
+      description: '',
+      tags: [],
+      timeSpent: 0,
+      visitCount: 1,
+      lastAccessed: new Date(),
+      isBookmarked: false,
+      isFavorite: false,
+      ...metadata
+    }
+  };
+};
+
+export const createNavigationSession = (
+  name: string,
+  projectPath: string,
+  description?: string
+): NavigationSession => {
+  return {
+    id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    name,
+    description,
+    locations: [],
+    layout: {
+      panelSizes: new Map([
+        ['minimap', 200],
+        ['fileTree', 250],
+        ['relationshipGraph', 300]
+      ]),
+      visiblePanels: ['minimap', 'fileTree', 'breadcrumbs'],
+      minimapSettings: {
+        zoomLevel: 1,
+        showSymbolTypes: true,
+        showComplexity: false,
+        autoUpdate: true,
+        renderQuality: 'medium',
+        maxFileSize: 1024 * 1024
+      },
+      treeSettings: {
+        showHiddenFiles: false,
+        showGitStatus: true,
+        showFileIcons: true,
+        sortBy: 'name',
+        sortOrder: 'asc',
+        virtualScrolling: true,
+        previewOnHover: true
+      },
+      graphSettings: {
+        defaultLayout: 'force-directed',
+        nodeSize: 20,
+        edgeWidth: 2,
+        animationSpeed: 1000,
+        showLabels: true,
+        clusterNodes: false,
+        maxNodes: 100
+      },
+      breadcrumbSettings: {
+        maxSegments: 8,
+        showFileExtensions: true,
+        showSymbolTypes: true,
+        truncationStrategy: 'intelligent',
+        showTooltips: true
+      }
+    },
+    createdAt: new Date(),
+    lastAccessed: new Date(),
+    metadata: {
+      projectPath,
+      totalTimeSpent: 0,
+      locationCount: 0,
+      tags: [],
+      isShared: false,
+      version: 1
+    }
+  };
+};
+
+export const createRelationship = (
+  type: RelationshipType,
+  source: Symbol,
+  target: Symbol,
+  strength: number = 1.0,
+  bidirectional: boolean = false
+): Relationship => {
+  return {
+    id: `relationship-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    type,
+    source,
+    target,
+    strength: Math.max(0, Math.min(1, strength)),
+    bidirectional,
+    metadata: {
+      confidence: 1.0,
+      sourceLocation: {
+        filePath: source.location.path,
+        position: {
+          line: source.location.line,
+          column: source.location.column
+        }
+      },
+      targetLocation: {
+        filePath: target.location.path,
+        position: {
+          line: target.location.line,
+          column: target.location.column
+        }
+      },
+      contextLines: [],
+      isDirectRelation: true,
+      relationshipDepth: 1
+    }
+  };
+};
+
+// ============================================================================
 // Utility Types
 // ============================================================================
 

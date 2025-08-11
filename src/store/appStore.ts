@@ -12,6 +12,7 @@ import {
   NavigationContext,
   PerformanceMetrics 
 } from '../types/navigation';
+import { navigationEventHelpers } from '../lib/navigationEventBus';
 
 interface AppState {
   // Current project state
@@ -77,12 +78,18 @@ interface AppState {
   addToNavigationHistory: (location: NavigationLocation) => void;
   loadNavigationHistory: () => Promise<void>;
   saveNavigationHistory: () => Promise<void>;
+  clearNavigationHistory: () => void;
+  navigateBack: () => NavigationLocation | null;
+  navigateForward: () => NavigationLocation | null;
   createNavigationSession: (name: string, description?: string) => NavigationSession;
   saveNavigationSession: (session: NavigationSession) => Promise<void>;
   loadNavigationSession: (sessionId?: string) => Promise<void>;
+  loadAllNavigationSessions: () => Promise<void>;
   setActiveNavigationSession: (session: NavigationSession) => void;
+  deleteNavigationSession: (sessionId: string) => Promise<void>;
   updateNavigationContext: (context: Partial<NavigationContext>) => void;
   getNavigationMetrics: () => Promise<void>;
+  updateNavigationMetrics: (metrics: Partial<PerformanceMetrics>) => void;
   
   // Note actions
   loadProjectNotes: (projectPath: string) => Promise<void>;
@@ -293,11 +300,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Enhanced search functionality
   searchSymbols: async (request: SearchRequest) => {
+    const startTime = Date.now();
     set({ isSearching: true });
     try {
       const results = await api.searchSymbols(request);
+      const searchTime = Date.now() - startTime;
+      
       set({ searchResults: results, isSearching: false });
       get().addToSearchHistory(request.query);
+
+      // Emit search performed event
+      navigationEventHelpers.emitSearchPerformed(request.query, results, 'AppStore', searchTime);
+      
       return results;
     } catch (error) {
       set({ isSearching: false, error: `Search failed: ${error}` });
@@ -371,8 +385,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Set current navigation location
   setCurrentLocation: (location: NavigationLocation) => {
+    const previousLocation = get().currentLocation;
     set({ currentLocation: location });
     get().addToNavigationHistory(location);
+    
+    // Update navigation context
+    get().updateNavigationContext({
+      breadcrumbs: [], // Will be populated by breadcrumb component
+      relatedSymbols: location.symbol ? [location.symbol] : []
+    });
+
+    // Emit location changed event
+    navigationEventHelpers.emitLocationChanged(location, 'AppStore', previousLocation);
   },
 
   // Add location to navigation history
@@ -386,8 +410,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         groupingStrategy: 'time-based'
       };
 
+      // Don't add duplicate consecutive entries
+      const lastEntry = currentHistory.entries[currentHistory.entries.length - 1];
+      if (lastEntry && 
+          lastEntry.location.filePath === location.filePath &&
+          lastEntry.location.position.line === location.position.line &&
+          lastEntry.location.position.column === location.position.column) {
+        return state;
+      }
+
       const newEntry = {
-        id: `entry-${Date.now()}`,
+        id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         location,
         action: 'navigate' as const,
         duration: 0,
@@ -416,6 +449,64 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       };
     });
+    
+    // Auto-save history periodically
+    get().saveNavigationHistory();
+  },
+
+  // Clear navigation history
+  clearNavigationHistory: () => {
+    set({
+      navigationHistory: {
+        entries: [],
+        currentIndex: -1,
+        sessions: [],
+        maxEntries: 100,
+        groupingStrategy: 'time-based'
+      }
+    });
+  },
+
+  // Navigate back in history
+  navigateBack: () => {
+    const { navigationHistory } = get();
+    if (!navigationHistory || navigationHistory.currentIndex <= 0) {
+      return null;
+    }
+
+    const newIndex = navigationHistory.currentIndex - 1;
+    const targetLocation = navigationHistory.entries[newIndex].location;
+
+    set({
+      navigationHistory: {
+        ...navigationHistory,
+        currentIndex: newIndex
+      },
+      currentLocation: targetLocation
+    });
+
+    return targetLocation;
+  },
+
+  // Navigate forward in history
+  navigateForward: () => {
+    const { navigationHistory } = get();
+    if (!navigationHistory || navigationHistory.currentIndex >= navigationHistory.entries.length - 1) {
+      return null;
+    }
+
+    const newIndex = navigationHistory.currentIndex + 1;
+    const targetLocation = navigationHistory.entries[newIndex].location;
+
+    set({
+      navigationHistory: {
+        ...navigationHistory,
+        currentIndex: newIndex
+      },
+      currentLocation: targetLocation
+    });
+
+    return targetLocation;
   },
 
   // Load navigation history from storage
@@ -447,7 +538,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Create a new navigation session
   createNavigationSession: (name: string, description?: string) => {
-    const { currentProject, navigationContext } = get();
+    const { currentProject } = get();
     
     const session: NavigationSession = {
       id: `session-${Date.now()}`,
@@ -527,6 +618,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           s.id === session.id ? session : s
         )
       }));
+
+      // Emit session saved event
+      navigationEventHelpers.emitSessionSaved(session, 'AppStore');
     } catch (error) {
       console.error('Failed to save navigation session:', error);
       throw error;
@@ -542,15 +636,68 @@ export const useAppStore = create<AppState>((set, get) => ({
       const session = await api.loadNavigationSession(currentProject.project_path, sessionId);
       if (session) {
         set({ activeNavigationSession: session });
+        
+        // Restore session locations to history if needed
+        if (session.locations.length > 0) {
+          const lastLocation = session.locations[session.locations.length - 1];
+          get().setCurrentLocation(lastLocation);
+        }
+
+        // Emit session loaded event
+        navigationEventHelpers.emitSessionLoaded(session, 'AppStore');
       }
     } catch (error) {
       console.error('Failed to load navigation session:', error);
     }
   },
 
+  // Load all navigation sessions for current project
+  loadAllNavigationSessions: async () => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    try {
+      const sessions = await api.loadAllNavigationSessions(currentProject.project_path);
+      if (sessions) {
+        set({ navigationSessions: sessions });
+      }
+    } catch (error) {
+      console.error('Failed to load navigation sessions:', error);
+      set({ navigationSessions: [] });
+    }
+  },
+
   // Set active navigation session
   setActiveNavigationSession: (session: NavigationSession) => {
     set({ activeNavigationSession: session });
+    
+    // Update session's last accessed time
+    const updatedSession = {
+      ...session,
+      lastAccessed: new Date()
+    };
+    
+    get().saveNavigationSession(updatedSession);
+  },
+
+  // Delete navigation session
+  deleteNavigationSession: async (sessionId: string) => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    try {
+      await api.deleteNavigationSession(currentProject.project_path, sessionId);
+      
+      set(state => ({
+        navigationSessions: state.navigationSessions.filter(s => s.id !== sessionId),
+        activeNavigationSession: state.activeNavigationSession?.id === sessionId 
+          ? null 
+          : state.activeNavigationSession
+      }));
+    } catch (error) {
+      console.error('Failed to delete navigation session:', error);
+      throw error;
+    }
   },
 
   // Update navigation context
@@ -558,7 +705,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     set(state => ({
       navigationContext: state.navigationContext 
         ? { ...state.navigationContext, ...context }
-        : context as NavigationContext
+        : {
+            projectPath: state.currentProject?.project_path || '',
+            breadcrumbs: [],
+            relatedSymbols: [],
+            ...context
+          } as NavigationContext
     }));
   },
 
@@ -572,6 +724,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error('Failed to get navigation metrics:', error);
     }
+  },
+
+  // Update navigation performance metrics
+  updateNavigationMetrics: (metrics: Partial<PerformanceMetrics>) => {
+    set(state => ({
+      navigationMetrics: state.navigationMetrics 
+        ? { ...state.navigationMetrics, ...metrics }
+        : {
+            navigationResponseTime: 0,
+            memoryUsage: 0,
+            cacheHitRate: 0,
+            backgroundProcessingTime: 0,
+            renderTime: 0,
+            searchTime: 0,
+            symbolAnalysisTime: 0,
+            ...metrics
+          } as PerformanceMetrics
+    }));
   },
 }));
 

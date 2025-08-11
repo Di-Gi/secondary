@@ -2,7 +2,7 @@
 // Purpose: Manages navigation layouts, sessions, and workspace contexts
 // Will be implemented in task 9.1
 
-import React from 'react';
+// import React from 'react'; // Will be used when component is implemented
 import { NavigationSession } from '../../types/navigation';
 
 export interface SessionManagerProps {
@@ -15,11 +15,6 @@ export interface SessionManagerProps {
 }
 
 export function SessionManager({
-  sessions,
-  activeSession,
-  onSessionCreate,
-  onSessionLoad,
-  onSessionSave,
   className = ''
 }: SessionManagerProps) {
   return (

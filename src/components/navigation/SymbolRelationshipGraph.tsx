@@ -2,7 +2,7 @@
 // Purpose: Interactive graph showing symbol dependencies and relationships
 // Will be implemented in task 5.1
 
-import React from 'react';
+// import React from 'react'; // Will be used when component is implemented
 import { RelationshipGraphData } from '../../types/navigation';
 import { Symbol } from '../../api';
 

@@ -2,7 +2,7 @@
 // Purpose: Context-aware history with session grouping and visual previews
 // Will be implemented in task 6.1
 
-import React from 'react';
+// import React from 'react'; // Will be used when component is implemented
 import { NavigationHistory as NavigationHistoryType, NavigationLocation } from '../../types/navigation';
 
 export interface NavigationHistoryProps {

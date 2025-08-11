@@ -2,7 +2,7 @@
 // Purpose: Provides comprehensive search across navigation history, symbols, and file content
 // Will be implemented in task 13.1
 
-import React from 'react';
+// import React from 'react'; // Will be used when component is implemented
 import { NavigationSearchQuery, SearchResult } from '../../types/navigation';
 
 export interface NavigationSearchProps {

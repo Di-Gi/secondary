@@ -2,17 +2,15 @@
 // Purpose: Central navigation interface that orchestrates all navigation components
 // Architecture: Composite component that manages state and coordinates between sub-components
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
-import { 
-  NavigationLocation, 
-  NavigationSession, 
+import {
+  NavigationLocation,
+  // NavigationSession, // Will be used when session management is implemented
   NavigationConfig,
-  NavigationContext,
-  LayoutConfiguration 
+  LayoutConfiguration
 } from '../../types/navigation';
 import { Symbol } from '../../api';
-import { useAppStore } from '../../store/appStore';
 
 // Component imports (will be implemented in subsequent tasks)
 // import { VisualMinimap } from './VisualMinimap';
@@ -33,29 +31,22 @@ export interface NavigationInterfaceProps {
 }
 
 export function NavigationInterface({
-  currentLocation,
-  onLocationChange,
-  onSymbolSelect,
   config,
   className = ''
 }: NavigationInterfaceProps) {
   // State management
-  const [activeSession, setActiveSession] = useState<NavigationSession | null>(null);
   const [layout, setLayout] = useState<LayoutConfiguration | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  
-  // Store integration
-  const { currentProject } = useAppStore();
 
-  // Navigation context
-  const navigationContext = useMemo<NavigationContext>(() => ({
-    projectPath: currentProject?.project_path || '',
-    sessionId: activeSession?.id,
-    breadcrumbs: [],
-    relatedSymbols: [],
-    gitBranch: currentProject?.git_status?.[0],
-    gitStatus: currentProject?.git_status?.[1]
-  }), [currentProject, activeSession]);
+  // Navigation context (will be used when components are implemented)
+  // const navigationContext = useMemo<NavigationContext>(() => ({
+  //   projectPath: currentProject?.project_path || '',
+  //   sessionId: activeSession?.id,
+  //   breadcrumbs: [],
+  //   relatedSymbols: [],
+  //   gitBranch: currentProject?.git_status?.[0],
+  //   gitStatus: currentProject?.git_status?.[1]
+  // }), [currentProject, activeSession]);
 
   // Initialize navigation interface
   useEffect(() => {
@@ -170,23 +161,23 @@ export function NavigationInterface({
     initializeNavigation();
   }, [config]);
 
-  // Handle location changes
-  const handleLocationChange = useCallback((location: NavigationLocation) => {
-    onLocationChange?.(location);
-  }, [onLocationChange]);
+  // Handle location changes (will be used when components are implemented)
+  // const handleLocationChange = useCallback((location: NavigationLocation) => {
+  //   onLocationChange?.(location);
+  // }, [onLocationChange]);
 
-  // Handle symbol selection
-  const handleSymbolSelect = useCallback((symbol: Symbol) => {
-    onSymbolSelect?.(symbol);
-  }, [onSymbolSelect]);
+  // Handle symbol selection (will be used when components are implemented)
+  // const handleSymbolSelect = useCallback((symbol: Symbol) => {
+  //   onSymbolSelect?.(symbol);
+  // }, [onSymbolSelect]);
 
-  // Handle session changes
-  const handleSessionChange = useCallback((session: NavigationSession) => {
-    setActiveSession(session);
-    if (session.layout) {
-      setLayout(session.layout);
-    }
-  }, []);
+  // Handle session changes (will be used when components are implemented)
+  // const handleSessionChange = useCallback((session: NavigationSession) => {
+  //   setActiveSession(session);
+  //   if (session.layout) {
+  //     setLayout(session.layout);
+  //   }
+  // }, []);
 
   if (!isInitialized || !layout) {
     return (
@@ -206,7 +197,7 @@ export function NavigationInterface({
             Breadcrumb navigation will be implemented in task 4.1
           </div>
         </div>
-        
+
         {/* Quick Action Toolbar - Will be implemented in task 8.1 */}
         <div className="quick-actions-container p-2 border-t">
           <div className="text-sm text-muted-foreground">
@@ -219,7 +210,7 @@ export function NavigationInterface({
       <div className="navigation-body flex-1 flex">
         {/* Left Panel - File Tree */}
         {layout.visiblePanels.includes('fileTree') && (
-          <div 
+          <div
             className="file-tree-panel border-r bg-background"
             style={{ width: layout.panelSizes.get('fileTree') || 250 }}
           >
@@ -237,7 +228,7 @@ export function NavigationInterface({
         <div className="main-content-panel flex-1 flex flex-col">
           {/* Minimap */}
           {layout.visiblePanels.includes('minimap') && (
-            <div 
+            <div
               className="minimap-container border-b bg-background"
               style={{ height: layout.panelSizes.get('minimap') || 200 }}
             >

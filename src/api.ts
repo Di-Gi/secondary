@@ -594,18 +594,31 @@ export const api = {
     }
   },
 
-  async listNavigationSessions(projectPath: string): Promise<any[]> {
+  async loadAllNavigationSessions(projectPath: string): Promise<any[]> {
     if (isTauri()) {
       try {
-        return await invoke('list_navigation_sessions', { projectPath });
+        return await invoke('load_all_navigation_sessions', { projectPath });
       } catch (error) {
-        console.error('Failed to list navigation sessions:', error);
+        console.error('Failed to load all navigation sessions:', error);
         return [];
       }
     } else {
       console.log('🔧 Development mode: Using mock navigation sessions list');
       await new Promise(resolve => setTimeout(resolve, 200));
       return [];
+    }
+  },
+
+  async deleteNavigationSession(projectPath: string, sessionId: string): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('delete_navigation_session', { projectPath, sessionId });
+      } catch (error) {
+        console.error('Failed to delete navigation session:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Navigation session deletion simulated');
     }
   },
 

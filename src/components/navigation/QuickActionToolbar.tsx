@@ -2,7 +2,7 @@
 // Purpose: Provides context-aware actions based on current navigation location
 // Will be implemented in task 8.1
 
-import React from 'react';
+// import React from 'react'; // Will be used when component is implemented
 import { ContextualAction, NavigationContext } from '../../types/navigation';
 
 export interface QuickActionToolbarProps {

@@ -10,9 +10,20 @@ import {
   NavigationSession, 
   NavigationHistory, 
   NavigationContext,
-  PerformanceMetrics 
+  PerformanceMetrics,
+  NavigationHistoryEntry,
+  HistorySession,
+  HistoryGroupingStrategy
 } from '../types/navigation';
 import { navigationEventHelpers } from '../lib/navigationEventBus';
+import {
+  groupEntriesIntoSessions,
+  createEnhancedHistoryEntry,
+  analyzeNavigationHistory,
+  cleanupHistory,
+  optimizeHistory,
+  HistoryInsights
+} from '../lib/navigationHistoryUtils';
 
 interface AppState {
   // Current project state
@@ -46,6 +57,11 @@ interface AppState {
   activeNavigationSession: NavigationSession | null;
   navigationContext: NavigationContext | null;
   navigationMetrics: PerformanceMetrics | null;
+  
+  // Enhanced History state
+  historyInsights: HistoryInsights | null;
+  historyGroupingStrategy: HistoryGroupingStrategy;
+  isHistoryAnalyzing: boolean;
   
   // UI state
   isLoading: boolean;
@@ -81,6 +97,14 @@ interface AppState {
   clearNavigationHistory: () => void;
   navigateBack: () => NavigationLocation | null;
   navigateForward: () => NavigationLocation | null;
+  
+  // Enhanced History actions
+  addEnhancedHistoryEntry: (location: NavigationLocation, action?: string, trigger?: string, duration?: number) => void;
+  groupHistoryIntoSessions: () => void;
+  analyzeHistory: () => Promise<void>;
+  setHistoryGroupingStrategy: (strategy: HistoryGroupingStrategy) => void;
+  optimizeNavigationHistory: () => void;
+  getHistoryInsights: () => HistoryInsights | null;
   createNavigationSession: (name: string, description?: string) => NavigationSession;
   saveNavigationSession: (session: NavigationSession) => Promise<void>;
   loadNavigationSession: (sessionId?: string) => Promise<void>;
@@ -120,6 +144,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeNavigationSession: null,
   navigationContext: null,
   navigationMetrics: null,
+  
+  // Enhanced History initial state
+  historyInsights: null,
+  historyGroupingStrategy: 'time-based',
+  isHistoryAnalyzing: false,
   
   isLoading: false,
   error: null,
@@ -399,15 +428,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     navigationEventHelpers.emitLocationChanged(location, 'AppStore', previousLocation);
   },
 
-  // Add location to navigation history
+  // Add location to navigation history (legacy method for compatibility)
   addToNavigationHistory: (location: NavigationLocation) => {
+    get().addEnhancedHistoryEntry(location, 'navigate', 'click', 0);
+  },
+
+  // Add enhanced history entry with full metadata
+  addEnhancedHistoryEntry: (location: NavigationLocation, action: string = 'navigate', trigger: string = 'click', duration: number = 0) => {
     set(state => {
       const currentHistory = state.navigationHistory || {
         entries: [],
         currentIndex: -1,
         sessions: [],
         maxEntries: 100,
-        groupingStrategy: 'time-based'
+        groupingStrategy: state.historyGroupingStrategy
       };
 
       // Don't add duplicate consecutive entries
@@ -419,36 +453,31 @@ export const useAppStore = create<AppState>((set, get) => ({
         return state;
       }
 
-      const newEntry = {
-        id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      // Create enhanced history entry with proper metadata
+      const newEntry = createEnhancedHistoryEntry(
         location,
-        action: 'navigate' as const,
-        duration: 0,
-        sessionId: state.activeNavigationSession?.id || 'default',
-        metadata: {
-          trigger: 'click' as const,
-          userAction: true,
-          confidence: 1.0,
-          relatedEntries: [],
-          tags: []
-        }
-      };
+        action as any,
+        trigger as any,
+        state.activeNavigationSession?.id || 'default',
+        duration
+      );
 
       const updatedEntries = [...currentHistory.entries, newEntry];
       
-      // Keep only the last maxEntries
-      if (updatedEntries.length > currentHistory.maxEntries) {
-        updatedEntries.splice(0, updatedEntries.length - currentHistory.maxEntries);
-      }
+      // Optimize history to remove duplicates and limit size
+      const optimizedHistory = optimizeHistory({
+        ...currentHistory,
+        entries: updatedEntries,
+        currentIndex: updatedEntries.length - 1
+      }, currentHistory.maxEntries);
 
       return {
-        navigationHistory: {
-          ...currentHistory,
-          entries: updatedEntries,
-          currentIndex: updatedEntries.length - 1
-        }
+        navigationHistory: optimizedHistory
       };
     });
+    
+    // Auto-group sessions and analyze history
+    get().groupHistoryIntoSessions();
     
     // Auto-save history periodically
     get().saveNavigationHistory();
@@ -742,6 +771,115 @@ export const useAppStore = create<AppState>((set, get) => ({
             ...metrics
           } as PerformanceMetrics
     }));
+  },
+
+  // ============================================================================
+  // Enhanced History Management Actions
+  // ============================================================================
+
+  // Group history entries into logical sessions
+  groupHistoryIntoSessions: () => {
+    set(state => {
+      if (!state.navigationHistory || state.navigationHistory.entries.length === 0) {
+        return state;
+      }
+
+      try {
+        const sessions = groupEntriesIntoSessions(state.navigationHistory.entries);
+        
+        return {
+          navigationHistory: {
+            ...state.navigationHistory,
+            sessions
+          }
+        };
+      } catch (error) {
+        console.error('Failed to group history into sessions:', error);
+        return state;
+      }
+    });
+  },
+
+  // Analyze navigation history to generate insights
+  analyzeHistory: async () => {
+    const { navigationHistory } = get();
+    if (!navigationHistory || navigationHistory.entries.length === 0) {
+      set({ historyInsights: null });
+      return;
+    }
+
+    set({ isHistoryAnalyzing: true });
+
+    try {
+      // Run analysis in a timeout to avoid blocking UI
+      const insights = await new Promise<HistoryInsights>((resolve) => {
+        setTimeout(() => {
+          const result = analyzeNavigationHistory(navigationHistory);
+          resolve(result);
+        }, 0);
+      });
+
+      set({ 
+        historyInsights: insights,
+        isHistoryAnalyzing: false 
+      });
+
+      // Emit performance warning if needed
+      if (insights.totalNavigations > 1000) {
+        navigationEventHelpers.emitPerformanceWarning(
+          'Large navigation history detected. Consider optimizing.',
+          'AppStore',
+          { totalNavigations: insights.totalNavigations }
+        );
+      }
+    } catch (error) {
+      console.error('Failed to analyze navigation history:', error);
+      set({ 
+        historyInsights: null,
+        isHistoryAnalyzing: false 
+      });
+    }
+  },
+
+  // Set history grouping strategy
+  setHistoryGroupingStrategy: (strategy: HistoryGroupingStrategy) => {
+    set(state => ({
+      historyGroupingStrategy: strategy,
+      navigationHistory: state.navigationHistory ? {
+        ...state.navigationHistory,
+        groupingStrategy: strategy
+      } : null
+    }));
+
+    // Re-group sessions with new strategy
+    get().groupHistoryIntoSessions();
+  },
+
+  // Optimize navigation history by removing duplicates and limiting size
+  optimizeNavigationHistory: () => {
+    set(state => {
+      if (!state.navigationHistory) return state;
+
+      try {
+        const cleanedHistory = cleanupHistory(state.navigationHistory);
+        const optimizedHistory = optimizeHistory(cleanedHistory, cleanedHistory.maxEntries);
+
+        return {
+          navigationHistory: optimizedHistory
+        };
+      } catch (error) {
+        console.error('Failed to optimize navigation history:', error);
+        return state;
+      }
+    });
+
+    // Re-analyze after optimization
+    get().analyzeHistory();
+  },
+
+  // Get current history insights
+  getHistoryInsights: () => {
+    return get().historyInsights;
   },
 }));
 

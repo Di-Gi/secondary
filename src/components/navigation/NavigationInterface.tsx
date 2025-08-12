@@ -12,10 +12,9 @@ import {
 } from '../../types/navigation';
 import { Symbol } from '../../api';
 import {
-  Map,
+  Map as MapIcon,
   GitBranch,
   Search,
-
   Code,
   FileText,
   Layers,
@@ -124,10 +123,11 @@ export function NavigationInterface({
   // Load minimap data when current location changes
   useEffect(() => {
     const loadMinimapData = async () => {
-      if (!currentLocation?.filePath) return;
-
+      // Always provide some default data even without currentLocation
+      const filePath = currentLocation?.filePath || 'demo-file.ts';
+      
       try {
-        const structure = await api.analyzeFileStructure(currentLocation.filePath);
+        const structure = await api.analyzeFileStructure(filePath);
         setFileStructure(structure);
         
         // Create minimap data from structure
@@ -135,8 +135,8 @@ export function NavigationInterface({
           symbolMap: structure.symbolDensity,
           structureOutline: structure.outline,
           visibleRegion: {
-            startLine: Math.max(0, currentLocation.position.line - 20),
-            endLine: currentLocation.position.line + 20,
+            startLine: Math.max(0, (currentLocation?.position.line || 10) - 20),
+            endLine: (currentLocation?.position.line || 10) + 20,
             startColumn: 0,
             endColumn: 100
           },
@@ -145,13 +145,50 @@ export function NavigationInterface({
         };
         
         setMinimapData(minimapData);
+        
+        // Set a default selected symbol if none exists
+        if (!selectedSymbol && structure.outline && structure.outline.length > 0) {
+          const firstSymbol = structure.outline.find((node: any) => node.symbol);
+          if (firstSymbol?.symbol) {
+            setSelectedSymbol(firstSymbol.symbol);
+          }
+        }
       } catch (error) {
         console.error('Failed to load minimap data:', error);
+        // Provide fallback data to prevent loading state
+        setMinimapData({
+          symbolMap: {
+            regions: [
+              {
+                startLine: 0,
+                endLine: 50,
+                density: 0.3,
+                symbolTypes: new Map([['TSFunction', 2], ['TSClass', 1]]),
+                complexity: 5
+              }
+            ],
+            maxDensity: 1,
+            totalSymbols: 3,
+            lastUpdated: new Date()
+          },
+          structureOutline: {
+            outline: [],
+            totalNodes: 50
+          },
+          visibleRegion: {
+            startLine: 0,
+            endLine: 50,
+            startColumn: 0,
+            endColumn: 100
+          },
+          zoomLevel: minimapZoom,
+          renderCache: new Map()
+        });
       }
     };
 
     loadMinimapData();
-  }, [currentLocation, minimapZoom]);
+  }, [currentLocation, minimapZoom, selectedSymbol]);
 
   // Handle minimap location clicks
   const handleMinimapLocationClick = (location: any) => {
@@ -324,7 +361,7 @@ export function NavigationInterface({
             <Card className="h-full border-0 rounded-none">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <Map className="h-4 w-4" />
+                  <MapIcon className="h-4 w-4" />
                   Code Structure
                   <div className="ml-auto flex items-center gap-1">
                     <Button
@@ -350,37 +387,27 @@ export function NavigationInterface({
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 p-2">
-                {minimapData ? (
-                  <VisualMinimap
-                    data={minimapData}
-                    currentLocation={currentLocation ? {
-                      filePath: currentLocation.filePath,
-                      position: currentLocation.position,
-                      symbol: currentLocation.symbol
-                    } : undefined}
-                    onLocationClick={handleMinimapLocationClick}
-                    onZoomChange={setMinimapZoom}
-                    settings={{
-                      zoomLevel: minimapZoom,
-                      showSymbolTypes: true,
-                      showComplexity: false,
-                      autoUpdate: true,
-                      renderQuality: 'medium',
-                      maxFileSize: 1024 * 1024
-                    }}
-                    width={280}
-                    height={350}
-                    className="w-full h-full"
-                  />
-                ) : (
-                  <div className="h-full bg-gray-50 rounded border-2 border-dashed border-gray-200 flex items-center justify-center">
-                    <div className="text-center text-gray-500">
-                      <Map className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <div className="text-sm font-medium">Loading Minimap...</div>
-                      <div className="text-xs">Analyzing file structure</div>
-                    </div>
-                  </div>
-                )}
+                <VisualMinimap
+                  data={minimapData}
+                  currentLocation={currentLocation ? {
+                    filePath: currentLocation.filePath,
+                    position: currentLocation.position,
+                    symbol: currentLocation.symbol
+                  } : undefined}
+                  onLocationClick={handleMinimapLocationClick}
+                  onZoomChange={setMinimapZoom}
+                  settings={{
+                    zoomLevel: minimapZoom,
+                    showSymbolTypes: true,
+                    showComplexity: false,
+                    autoUpdate: true,
+                    renderQuality: 'medium',
+                    maxFileSize: 1024 * 1024
+                  }}
+                  width={280}
+                  height={350}
+                  className="w-full h-full"
+                />
               </CardContent>
             </Card>
           </div>
@@ -403,11 +430,21 @@ export function NavigationInterface({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 p-4">
-                  <SymbolRelationshipGraph
-                    centerSymbol={selectedSymbol || undefined}
-                    onSymbolSelect={handleSymbolSelect}
-                    className="h-full"
-                  />
+                  {selectedSymbol ? (
+                    <SymbolRelationshipGraph
+                      centerSymbol={selectedSymbol}
+                      onSymbolSelect={handleSymbolSelect}
+                      className="h-full"
+                    />
+                  ) : (
+                    <div className="h-full bg-gray-50 rounded border-2 border-dashed border-gray-200 flex items-center justify-center">
+                      <div className="text-center text-gray-500">
+                        <Network className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <div className="text-sm font-medium">No Symbol Selected</div>
+                        <div className="text-xs">Click on a symbol in the minimap to view relationships</div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

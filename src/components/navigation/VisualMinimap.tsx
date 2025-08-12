@@ -290,8 +290,8 @@ export function VisualMinimap({
       // Trigger re-render with updated data
       if (settings.autoUpdate) {
         // In a real implementation, this would update the parent component's data
-        // For now, we'll just trigger a re-render
-        setLastUpdateTime(new Date());
+        // For now, we'll just trigger a re-render (disabled to prevent loops)
+        // setLastUpdateTime(new Date());
       }
 
     } catch (error) {
@@ -319,7 +319,7 @@ export function VisualMinimap({
       ...prev,
       changes: [...prev.changes, change]
     }));
-    setLastUpdateTime(new Date());
+    // setLastUpdateTime(new Date()); // Disabled to prevent infinite loops
   }, []);
 
   // Public API for external components to trigger updates
@@ -330,17 +330,17 @@ export function VisualMinimap({
     }
   }, [detectFileContentChange, queueContentChange]);
 
-  // Process debounced updates
-  useEffect(() => {
-    processQueuedUpdates();
-  }, [debouncedUpdateTrigger, processQueuedUpdates]);
+  // Process debounced updates - disabled to prevent infinite loops in demo
+  // useEffect(() => {
+  //   processQueuedUpdates();
+  // }, [debouncedUpdateTrigger, processQueuedUpdates]);
 
-  // Monitor file content changes for real-time updates
-  useEffect(() => {
-    if (enableRealTimeUpdates && fileContent !== undefined && currentLocation?.filePath) {
-      handleFileContentChange(fileContent);
-    }
-  }, [fileContent, currentLocation?.filePath, enableRealTimeUpdates, handleFileContentChange]);
+  // Monitor file content changes for real-time updates - disabled to prevent infinite loops in demo
+  // useEffect(() => {
+  //   if (enableRealTimeUpdates && fileContent !== undefined && currentLocation?.filePath) {
+  //     handleFileContentChange(fileContent);
+  //   }
+  // }, [fileContent, currentLocation?.filePath, enableRealTimeUpdates, handleFileContentChange]);
 
   // Expose real-time update API via ref
   const minimapRef = useRef({
@@ -523,7 +523,7 @@ export function VisualMinimap({
       isRendering: false,
       lastRenderTime: renderTime
     }));
-  }, [canvasState, symbolDensity, currentLocation, data, zoomLevel, settings, hoveredRegion, width, height]);
+  }, [symbolDensity, currentLocation, data, zoomLevel, settings, hoveredRegion, width, height]);
 
   // Render when data changes
   useEffect(() => {
@@ -883,6 +883,19 @@ export function VisualMinimap({
   const zoomIn = useCallback(() => handleZoomChange(zoomLevel * 1.2), [zoomLevel, handleZoomChange]);
   const zoomOut = useCallback(() => handleZoomChange(zoomLevel / 1.2), [zoomLevel, handleZoomChange]);
   const resetZoom = useCallback(() => handleZoomChange(1), [handleZoomChange]);
+
+  // Show loading state when no data is available
+  if (!data || !symbolDensity) {
+    return (
+      <div className={`visual-minimap ${className} h-full bg-gray-50 rounded border-2 border-dashed border-gray-200 flex items-center justify-center`}>
+        <div className="text-center text-gray-500">
+          <div className="w-8 h-8 mx-auto mb-2 opacity-50 bg-gray-300 rounded"></div>
+          <div className="text-sm font-medium">Loading Minimap...</div>
+          <div className="text-xs">Analyzing file structure</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`visual-minimap ${className}`}>

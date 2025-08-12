@@ -2,7 +2,7 @@
 // Purpose: Interactive graph showing symbol dependencies and relationships
 // Features: Force-directed layout, pan/zoom, node selection, relationship visualization
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as d3 from 'd3';
 import { 
   RelationshipGraphData, 
@@ -114,6 +114,31 @@ export function SymbolRelationshipGraph({
     dependency: boolean;
   }>({ structural: true, behavioral: true, dependency: true });
   const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null);
+
+  // Generate mock data when no data is provided but centerSymbol exists
+  const generateMockData = useCallback((symbol: Symbol): RelationshipGraphData => {
+    return {
+      nodes: [
+        {
+          id: symbol.identifier,
+          symbol: symbol,
+          position: { x: width / 2, y: height / 2 },
+          size: 16,
+          isSelected: true,
+          metadata: { degree: 0, importance: 1 }
+        }
+      ],
+      edges: [],
+      metadata: {
+        totalNodes: 1,
+        totalEdges: 0,
+        maxDepth: 0,
+        centerNodeId: symbol.identifier,
+        lastUpdated: new Date(),
+        analysisTime: 0
+      }
+    };
+  }, [width, height]);
 
   // Convert navigation data to D3 format
   const convertToD3Data = useCallback((graphData: RelationshipGraphData) => {
@@ -260,7 +285,7 @@ export function SymbolRelationshipGraph({
       
       return newFilters;
     });
-  }, [onRelationshipFilter, data]);
+  }, [onRelationshipFilter, graphData]);
 
   // Handle category filter toggle
   const toggleCategoryFilter = useCallback((category: 'structural' | 'behavioral' | 'dependency') => {
@@ -295,7 +320,7 @@ export function SymbolRelationshipGraph({
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    const { nodes, links } = convertToD3Data(data);
+    const { nodes, links } = convertToD3Data(graphData);
     
     if (nodes.length === 0) {
       // Show empty state
@@ -457,7 +482,7 @@ export function SymbolRelationshipGraph({
     return () => {
       simulation.stop();
     };
-  }, [data, width, height, selectedNode, hoveredNode, hoveredEdge, enableHover, expandedNodes, convertToD3Data, initializeSimulation, handleNodeClick, handleNodeHover, handleEdgeHover, toggleNodeExpansion, navigateToSymbol]);
+  }, [graphData, width, height, selectedNode, hoveredNode, hoveredEdge, enableHover, expandedNodes, convertToD3Data, initializeSimulation, handleNodeClick, handleNodeHover, handleEdgeHover, toggleNodeExpansion, navigateToSymbol]);
 
   // Cleanup simulation on unmount
   useEffect(() => {
@@ -467,6 +492,24 @@ export function SymbolRelationshipGraph({
       }
     };
   }, []);
+
+  // Show empty state when no center symbol is provided
+  if (!centerSymbol) {
+    return (
+      <div className={`symbol-relationship-graph ${className} h-full bg-gray-50 rounded border-2 border-dashed border-gray-200 flex items-center justify-center`} data-testid="relationship-graph-container">
+        <div className="text-center text-gray-500">
+          <div className="w-8 h-8 mx-auto mb-2 opacity-50 bg-gray-300 rounded-full"></div>
+          <div className="text-sm font-medium">No Symbol Selected</div>
+          <div className="text-xs">Click on a symbol in the minimap to view relationships</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Use provided data or generate mock data
+  const graphData = useMemo(() => {
+    return data || generateMockData(centerSymbol);
+  }, [data, centerSymbol, generateMockData]);
 
   return (
     <div className={`symbol-relationship-graph ${className}`} data-testid="relationship-graph-container">

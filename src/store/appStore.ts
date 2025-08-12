@@ -115,6 +115,12 @@ interface AppState {
   getNavigationMetrics: () => Promise<void>;
   updateNavigationMetrics: (metrics: Partial<PerformanceMetrics>) => void;
   
+  // Layout configuration persistence actions
+  saveLayoutConfiguration: (layout: LayoutConfiguration) => Promise<void>;
+  loadLayoutConfiguration: () => Promise<LayoutConfiguration | null>;
+  applyLayoutConfiguration: (layout: LayoutConfiguration) => Promise<{ success: boolean; appliedChanges: string[]; errors: string[] }>;
+  resetLayoutConfiguration: () => Promise<void>;
+  
   // Note actions
   loadProjectNotes: (projectPath: string) => Promise<void>;
   saveNote: (note: ProjectNote) => Promise<void>;
@@ -656,7 +662,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // Load navigation session
+  // Load navigation session with restoration
   loadNavigationSession: async (sessionId?: string) => {
     const { currentProject } = get();
     if (!currentProject) return;
@@ -664,16 +670,34 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const session = await api.loadNavigationSession(currentProject.project_path, sessionId);
       if (session) {
-        set({ activeNavigationSession: session });
+        // Use session restoration manager for proper restoration
+        const { sessionRestorationManager } = await import('../lib/sessionRestoration');
         
-        // Restore session locations to history if needed
-        if (session.locations.length > 0) {
-          const lastLocation = session.locations[session.locations.length - 1];
-          get().setCurrentLocation(lastLocation);
-        }
+        const restorationResult = await sessionRestorationManager.restoreSession(session, (step, progress) => {
+          console.log(`Session restoration: ${step} (${progress}%)`);
+        });
 
-        // Emit session loaded event
-        navigationEventHelpers.emitSessionLoaded(session, 'AppStore');
+        if (restorationResult.success && restorationResult.session) {
+          set({ activeNavigationSession: restorationResult.session });
+          
+          // Restore session locations to history if needed
+          if (restorationResult.session.locations.length > 0) {
+            const lastLocation = restorationResult.session.locations[restorationResult.session.locations.length - 1];
+            get().setCurrentLocation(lastLocation);
+          }
+
+          // Log any warnings
+          if (restorationResult.warnings.length > 0) {
+            console.warn('Session restoration warnings:', restorationResult.warnings);
+          }
+
+          // Emit session loaded event
+          navigationEventHelpers.emitSessionLoaded(restorationResult.session, 'AppStore');
+        } else {
+          console.error('Session restoration failed:', restorationResult.error);
+          // Fall back to basic session loading
+          set({ activeNavigationSession: session });
+        }
       }
     } catch (error) {
       console.error('Failed to load navigation session:', error);
@@ -689,6 +713,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       const sessions = await api.loadAllNavigationSessions(currentProject.project_path);
       if (sessions) {
         set({ navigationSessions: sessions });
+        
+        // Auto-restore last session if enabled and no active session
+        const { activeNavigationSession } = get();
+        if (!activeNavigationSession && sessions.length > 0) {
+          const { getLastAccessedSession } = await import('../lib/sessionRestoration');
+          const lastSession = getLastAccessedSession(sessions);
+          
+          if (lastSession) {
+            console.log('Auto-restoring last session:', lastSession.name);
+            await get().loadNavigationSession(lastSession.id);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load navigation sessions:', error);
@@ -771,6 +807,155 @@ export const useAppStore = create<AppState>((set, get) => ({
             ...metrics
           } as PerformanceMetrics
     }));
+  },
+
+  // ============================================================================
+  // Layout Configuration Persistence
+  // ============================================================================
+
+  // Save current layout configuration
+  saveLayoutConfiguration: async (layout: LayoutConfiguration) => {
+    const { currentProject, activeNavigationSession } = get();
+    if (!currentProject) return;
+
+    try {
+      const { serializeLayoutConfiguration } = await import('../lib/sessionRestoration');
+      const serializedLayout = serializeLayoutConfiguration(layout);
+      
+      // Save to localStorage for immediate persistence
+      localStorage.setItem(
+        `navigation-layout-${currentProject.project_path}`, 
+        JSON.stringify(serializedLayout)
+      );
+
+      // Update active session if exists
+      if (activeNavigationSession) {
+        const updatedSession = {
+          ...activeNavigationSession,
+          layout,
+          lastAccessed: new Date()
+        };
+        await get().saveNavigationSession(updatedSession);
+      }
+    } catch (error) {
+      console.error('Failed to save layout configuration:', error);
+    }
+  },
+
+  // Load layout configuration
+  loadLayoutConfiguration: async (): Promise<LayoutConfiguration | null> => {
+    const { currentProject } = get();
+    if (!currentProject) return null;
+
+    try {
+      // Try to load from localStorage first
+      const stored = localStorage.getItem(`navigation-layout-${currentProject.project_path}`);
+      if (stored) {
+        const { deserializeLayoutConfiguration } = await import('../lib/sessionRestoration');
+        const serializedLayout = JSON.parse(stored);
+        return deserializeLayoutConfiguration(serializedLayout);
+      }
+
+      // Fall back to active session layout
+      const { activeNavigationSession } = get();
+      if (activeNavigationSession?.layout) {
+        return activeNavigationSession.layout;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to load layout configuration:', error);
+      return null;
+    }
+  },
+
+  // Apply layout configuration to current interface
+  applyLayoutConfiguration: async (layout: LayoutConfiguration) => {
+    try {
+      const { applyLayoutConfiguration } = await import('../lib/sessionRestoration');
+      const result = applyLayoutConfiguration(layout);
+      
+      if (result.success) {
+        console.log('Applied layout configuration:', result.appliedChanges);
+        
+        // Update active session with new layout
+        const { activeNavigationSession } = get();
+        if (activeNavigationSession) {
+          const updatedSession = {
+            ...activeNavigationSession,
+            layout,
+            lastAccessed: new Date()
+          };
+          set({ activeNavigationSession: updatedSession });
+        }
+      } else {
+        console.error('Failed to apply layout configuration:', result.errors);
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Failed to apply layout configuration:', error);
+      return { success: false, appliedChanges: [], errors: [String(error)] };
+    }
+  },
+
+  // Reset layout to default
+  resetLayoutConfiguration: async () => {
+    const { currentProject } = get();
+    if (!currentProject) return;
+
+    try {
+      // Remove from localStorage
+      localStorage.removeItem(`navigation-layout-${currentProject.project_path}`);
+      
+      // Create default layout
+      const defaultLayout: LayoutConfiguration = {
+        panelSizes: new Map([
+          ['minimap', 200],
+          ['fileTree', 250],
+          ['relationshipGraph', 300]
+        ]),
+        visiblePanels: ['minimap', 'fileTree', 'breadcrumbs'],
+        minimapSettings: {
+          zoomLevel: 1,
+          showSymbolTypes: true,
+          showComplexity: false,
+          autoUpdate: true,
+          renderQuality: 'medium',
+          maxFileSize: 1024 * 1024
+        },
+        treeSettings: {
+          showHiddenFiles: false,
+          showGitStatus: true,
+          showFileIcons: true,
+          sortBy: 'name',
+          sortOrder: 'asc',
+          virtualScrolling: true,
+          previewOnHover: true
+        },
+        graphSettings: {
+          defaultLayout: 'force-directed',
+          nodeSize: 20,
+          edgeWidth: 2,
+          animationSpeed: 1000,
+          showLabels: true,
+          clusterNodes: false,
+          maxNodes: 100
+        },
+        breadcrumbSettings: {
+          maxSegments: 8,
+          showFileExtensions: true,
+          showSymbolTypes: true,
+          truncationStrategy: 'intelligent',
+          showTooltips: true
+        }
+      };
+
+      await get().applyLayoutConfiguration(defaultLayout);
+      console.log('Reset layout configuration to defaults');
+    } catch (error) {
+      console.error('Failed to reset layout configuration:', error);
+    }
   },
 
   // ============================================================================

@@ -23,6 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tauri::Builder::default()
         .manage(AppState {
             current_project: Mutex::new(None),
+            navigation_cache: Mutex::new(secondary_mind_core::components::navigation_cache::NavigationCache::new()),
         })
         .invoke_handler(tauri::generate_handler![
             commands::initialize_app,
@@ -38,7 +39,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::enhanced_ai_synthesis,
             commands::save_session,
             commands::load_session,
-            commands::start_file_watching
+            commands::start_file_watching,
+            commands::analyze_file_structure,
+            commands::analyze_symbol_relationships,
+            commands::analyze_symbol_usage,
+            commands::get_enhanced_file_tree,
+            commands::save_navigation_history,
+            commands::load_navigation_history,
+            commands::save_navigation_session,
+            commands::load_navigation_session,
+            commands::load_all_navigation_sessions,
+            commands::delete_navigation_session,
+            commands::cleanup_navigation_data,
+            commands::analyze_call_hierarchy,
+            commands::find_function_callers,
+            commands::analyze_inheritance_hierarchy,
+            commands::get_class_members,
+            commands::find_implementations,
+            commands::get_navigation_metrics,
+            commands::get_file_git_status,
+            commands::get_files_git_status,
+            commands::is_git_repository,
+            commands::get_git_repository_root
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]

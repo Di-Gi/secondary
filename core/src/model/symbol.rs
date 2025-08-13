@@ -64,5 +64,48 @@ impl std::fmt::Display for SymbolKind {
     }
 }
 
+// Navigation-specific data structures for enhanced file analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StructureNode {
+    pub name: String,
+    pub node_type: String,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub children: Vec<StructureNode>,
+    pub symbol: Option<Symbol>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolDensityMap {
+    pub regions: Vec<DensityRegion>,
+    pub max_density: f64,
+    pub total_symbols: usize,
+    pub last_updated: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DensityRegion {
+    pub start_line: usize,
+    pub end_line: usize,
+    pub symbol_count: usize,
+    pub density: f64,
+    pub symbol_types: std::collections::HashMap<String, usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileMetadata {
+    pub file_size: u64,
+    pub last_modified: chrono::DateTime<chrono::Utc>,
+    pub language: String,
+    pub encoding: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileStructureAnalysis {
+    pub outline: Vec<StructureNode>,
+    pub symbol_density: SymbolDensityMap,
+    pub file_metadata: FileMetadata,
+}
+
 // Integration: [This model is created by the parsers in `CodebaseCartographer` and consumed by the `desktop` application and frontend UI.]
 // Notes: [Adding `Serialize` and `Deserialize` is crucial for passing this data across the Tauri bridge to the frontend.]

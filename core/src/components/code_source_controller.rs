@@ -5,19 +5,44 @@
 
 use crate::errors::SecondaryMindError;
 use crate::model::project::Project;
-// REMOVED: unused import
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum GitFileStatus {
+    Untracked,
+    Modified,
+    Added,
+    Deleted,
+    Renamed,
+    Copied,
+    UpdatedButUnmerged,
+    Ignored,
+    Clean,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitStatusCache {
+    pub statuses: HashMap<PathBuf, GitFileStatus>,
+    pub last_updated: std::time::SystemTime,
+    pub cache_duration: std::time::Duration,
+}
 
 /// Controller for managing the source code via filesystem and Git.
 pub struct CodeSourceController {
     project: Project,
+    git_status_cache: Option<GitStatusCache>,
 }
 
 impl CodeSourceController {
     /// Initializes the controller for a given project path.
     pub fn new(path: &Path) -> Result<Self, SecondaryMindError> {
         let project = Project::new(path)?;
-        Ok(Self { project })
+        Ok(Self { 
+            project,
+            git_status_cache: None,
+        })
     }
 
     /// Checks the Git status of the project, comparing local to remote.
@@ -64,6 +89,138 @@ impl CodeSourceController {
         };
 
         Ok((local_branch_name, remote_status))
+    }
+
+    /// Gets the git status for a specific file.
+    /// Returns None if not in a git repository or if the file is not tracked.
+    pub fn get_file_git_status(&mut self, file_path: &Path) -> Option<GitFileStatus> {
+        // Check if we have a git repository
+        let repo = self.project.repository.as_ref()?;
+        
+        // Check cache first
+        if let Some(ref cache) = self.git_status_cache {
+            if cache.last_updated.elapsed().unwrap_or(cache.cache_duration) < cache.cache_duration {
+                if let Some(status) = cache.statuses.get(file_path) {
+                    return Some(status.clone());
+                }
+            }
+        }
+
+        // Get relative path from repository root
+        let repo_root = self.project.root.clone();
+        let relative_path = file_path.strip_prefix(&repo_root).ok()?;
+
+        // Get git status for the file
+        match repo.status_file(relative_path) {
+            Ok(flags) => Some(self.git_status_from_flags(flags)),
+            Err(_) => {
+                // File might not be tracked, check if it exists in the working directory
+                if file_path.exists() {
+                    Some(GitFileStatus::Untracked)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    /// Gets git status for multiple files efficiently.
+    /// Returns a HashMap with file paths as keys and their git status as values.
+    pub fn get_files_git_status(&mut self, file_paths: &[PathBuf]) -> HashMap<PathBuf, GitFileStatus> {
+        let mut result = HashMap::new();
+        
+        // Check if we have a git repository
+        let repo = match self.project.repository.as_ref() {
+            Some(repo) => repo,
+            None => return result, // Return empty map for non-git projects
+        };
+
+        // Check if we need to refresh the cache
+        let should_refresh_cache = self.git_status_cache.as_ref()
+            .map(|cache| cache.last_updated.elapsed().unwrap_or(cache.cache_duration) >= cache.cache_duration)
+            .unwrap_or(true);
+
+        if should_refresh_cache {
+            self.refresh_git_status_cache();
+        }
+
+        // Get status for each requested file
+        for file_path in file_paths {
+            if let Some(status) = self.get_file_git_status(file_path) {
+                result.insert(file_path.clone(), status);
+            }
+        }
+
+        result
+    }
+
+    /// Refreshes the git status cache for better performance.
+    pub fn refresh_git_status_cache(&mut self) {
+        let repo = match self.project.repository.as_ref() {
+            Some(repo) => repo,
+            None => return,
+        };
+
+        let mut statuses = HashMap::new();
+        
+        // Get all file statuses from git
+        if let Ok(git_statuses) = repo.statuses(None) {
+            let repo_root = &self.project.root;
+            
+            for entry in git_statuses.iter() {
+                if let Some(path_str) = entry.path() {
+                    let file_path = repo_root.join(path_str);
+                    let status = self.git_status_from_flags(entry.status());
+                    statuses.insert(file_path, status);
+                }
+            }
+        }
+
+        self.git_status_cache = Some(GitStatusCache {
+            statuses,
+            last_updated: std::time::SystemTime::now(),
+            cache_duration: std::time::Duration::from_secs(30), // Cache for 30 seconds
+        });
+    }
+
+    /// Checks if the project is a git repository.
+    pub fn is_git_repository(&self) -> bool {
+        self.project.repository.is_some()
+    }
+
+    /// Gets the repository root path.
+    pub fn get_repository_root(&self) -> Option<&PathBuf> {
+        if self.project.repository.is_some() {
+            Some(&self.project.root)
+        } else {
+            None
+        }
+    }
+
+    /// Converts git2 status flags to our GitFileStatus enum.
+    fn git_status_from_flags(&self, flags: git2::Status) -> GitFileStatus {
+        if flags.contains(git2::Status::WT_NEW) || flags.contains(git2::Status::INDEX_NEW) {
+            GitFileStatus::Added
+        } else if flags.contains(git2::Status::WT_MODIFIED) || flags.contains(git2::Status::INDEX_MODIFIED) {
+            GitFileStatus::Modified
+        } else if flags.contains(git2::Status::WT_DELETED) || flags.contains(git2::Status::INDEX_DELETED) {
+            GitFileStatus::Deleted
+        } else if flags.contains(git2::Status::WT_RENAMED) || flags.contains(git2::Status::INDEX_RENAMED) {
+            GitFileStatus::Renamed
+        } else if flags.contains(git2::Status::WT_TYPECHANGE) || flags.contains(git2::Status::INDEX_TYPECHANGE) {
+            GitFileStatus::Modified
+        } else if flags.contains(git2::Status::IGNORED) {
+            GitFileStatus::Ignored
+        } else if flags.is_empty() {
+            GitFileStatus::Clean
+        } else {
+            GitFileStatus::Untracked
+        }
+    }
+
+    /// Invalidates the git status cache, forcing a refresh on next access.
+    pub fn invalidate_git_status_cache(&mut self) {
+        self.git_status_cache = None;
     }
 }
 // Integration: Instantiated in `main.rs` to provide Git status information upon startup. This will be the source for other components needing file content.

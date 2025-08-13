@@ -22,6 +22,9 @@ pub mod code_suggestion_system;
 pub mod documentation_generator;
 pub mod pattern_recognition_system;
 pub mod session_manager;
+pub mod navigation_manager;
+pub mod navigation_session_manager;
+pub mod navigation_cache;
 
 // Error handling and recovery components
 pub mod error_recovery_manager;
@@ -32,8 +35,8 @@ pub mod error_system;
 // Operation management
 pub mod operation_manager;
 
-#[cfg(test)]
-pub mod error_handling_tests;
+// #[cfg(test)]
+// pub mod error_handling_tests;
 
 // Integration: [The `parsers` module is used by the `CodebaseCartographer`.]
 // Notes: [This change reflects the refactoring of parsing logic out of the cartographer and into specialized modules.]

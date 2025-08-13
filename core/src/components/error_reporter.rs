@@ -125,6 +125,7 @@ impl ErrorReporter {
             crate::errors::SecondaryMindError::SessionError { .. } => "SessionError".to_string(),
             crate::errors::SecondaryMindError::ComponentDegraded { .. } => "ComponentDegraded".to_string(),
             crate::errors::SecondaryMindError::RecoveryFailed { .. } => "RecoveryFailed".to_string(),
+            crate::errors::SecondaryMindError::ValidationError(_) => "ValidationError".to_string(),
         }
     }
 

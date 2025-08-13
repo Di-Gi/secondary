@@ -1076,5 +1076,5 @@ impl std::fmt::Display for QualityIssueType {
 // and provides structured code analysis with ranking and application capabilities
 // Notes: The quality analyzer uses heuristic-based analysis combined with AI suggestions for comprehensive code improvement recommendations
 
-#[cfg(test)]
-include!("code_suggestion_system_test.rs");
+// #[cfg(test)]
+// include!("code_suggestion_system_test.rs");

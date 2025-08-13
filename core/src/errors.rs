@@ -3,10 +3,17 @@
 // Architecture: Centralized error definitions with recovery mechanisms and graceful degradation.
 // Dependencies: thiserror, serde, chrono, log.
 
+pub mod navigation_error;
+
 use thiserror::Error;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+
+// Re-export navigation error types
+pub use navigation_error::{
+    NavigationError, NavigationErrorSeverity, NavigationRecoveryStrategy, NavigationErrorContext
+};
 
 #[derive(Error, Debug, Clone, Serialize, Deserialize)]
 pub enum SecondaryMindError {
@@ -62,6 +69,9 @@ pub enum SecondaryMindError {
     
     #[error("Session error: {operation} failed - {reason}")]
     SessionError { operation: String, reason: String },
+    
+    #[error("Validation error: {0}")]
+    ValidationError(String),
     
     // Recovery and degradation errors
     #[error("Component degraded: {component} running in limited mode - {reason}")]
@@ -140,6 +150,7 @@ impl SecondaryMindError {
             SecondaryMindError::SessionError { .. } => ErrorSeverity::Medium,
             SecondaryMindError::ComponentDegraded { .. } => ErrorSeverity::Low,
             SecondaryMindError::RecoveryFailed { .. } => ErrorSeverity::High,
+            SecondaryMindError::ValidationError(_) => ErrorSeverity::Medium,
         }
     }
 
@@ -191,6 +202,9 @@ impl SecondaryMindError {
             SecondaryMindError::RecoveryFailed { .. } => RecoveryStrategy::Manual { 
                 instructions: "Manual intervention required - check logs for details".to_string() 
             },
+            SecondaryMindError::ValidationError(_) => RecoveryStrategy::Manual { 
+                instructions: "Fix validation errors and retry".to_string() 
+            },
         }
     }
 
@@ -217,6 +231,7 @@ impl SecondaryMindError {
             SecondaryMindError::SessionError { .. } => "Session management error. Some settings may not be preserved.".to_string(),
             SecondaryMindError::ComponentDegraded { component, .. } => format!("{} is running in limited mode.", component),
             SecondaryMindError::RecoveryFailed { component, .. } => format!("{} could not be restored. Manual intervention may be required.", component),
+            SecondaryMindError::ValidationError(msg) => format!("Validation failed: {}", msg),
         }
     }
 

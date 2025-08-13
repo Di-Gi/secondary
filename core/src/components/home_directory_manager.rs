@@ -32,7 +32,7 @@ impl HomeDirectoryManager {
         }
         
         // Create subdirectories
-        let subdirs = ["projects", "notes", "cache", "config"];
+        let subdirs = ["projects", "notes", "cache", "config", "navigation"];
         for subdir in &subdirs {
             let path = secondary_dir.join(subdir);
             if !path.exists() {
@@ -74,6 +74,11 @@ impl HomeDirectoryManager {
         self.secondary_dir.join("config")
     }
     
+    /// Gets the path to the navigation directory
+    pub fn get_navigation_dir(&self) -> PathBuf {
+        self.secondary_dir.join("navigation")
+    }
+    
     /// Generates a unique project ID from a project path
     pub fn generate_project_id(project_path: &Path) -> String {
         use std::collections::hash_map::DefaultHasher;
@@ -96,6 +101,36 @@ impl HomeDirectoryManager {
         self.get_notes_dir().join(project_id)
     }
     
+    /// Gets the navigation history directory for a specific project
+    pub fn get_project_navigation_dir(&self, project_path: &Path) -> PathBuf {
+        let project_id = Self::generate_project_id(project_path);
+        self.get_navigation_dir().join(project_id)
+    }
+    
+    /// Gets the navigation history file path for a specific project
+    pub fn get_navigation_history_file(&self, project_path: &Path) -> PathBuf {
+        self.get_project_navigation_dir(project_path).join("history.json")
+    }
+    
+    /// Gets the navigation sessions directory for a specific project
+    pub fn get_project_navigation_sessions_dir(&self, project_path: &Path) -> PathBuf {
+        self.get_project_navigation_dir(project_path).join("sessions")
+    }
+    
+    /// Gets the general navigation sessions directory (for all projects)
+    pub fn get_navigation_sessions_dir(&self) -> Result<PathBuf, SecondaryMindError> {
+        let sessions_dir = self.get_navigation_dir().join("sessions");
+        if !sessions_dir.exists() {
+            fs::create_dir_all(&sessions_dir).map_err(|e| {
+                SecondaryMindError::IoError {
+                    path: sessions_dir.clone(),
+                    message: e.to_string(),
+                }
+            })?;
+        }
+        Ok(sessions_dir)
+    }
+    
     /// Ensures a project-specific directory exists
     pub fn ensure_project_dir(&self, project_path: &Path) -> Result<PathBuf, SecondaryMindError> {
         let project_dir = self.get_project_dir(project_path);
@@ -116,6 +151,28 @@ impl HomeDirectoryManager {
             fs::create_dir_all(&notes_dir).map_err(|e| {
                 SecondaryMindError::IoError {
                     path: notes_dir.clone(),
+                    message: e.to_string(),
+                }
+            })?;
+        }
+        
+        // Create navigation directory
+        let navigation_dir = self.get_project_navigation_dir(project_path);
+        if !navigation_dir.exists() {
+            fs::create_dir_all(&navigation_dir).map_err(|e| {
+                SecondaryMindError::IoError {
+                    path: navigation_dir.clone(),
+                    message: e.to_string(),
+                }
+            })?;
+        }
+        
+        // Create navigation sessions directory
+        let sessions_dir = self.get_project_navigation_sessions_dir(project_path);
+        if !sessions_dir.exists() {
+            fs::create_dir_all(&sessions_dir).map_err(|e| {
+                SecondaryMindError::IoError {
+                    path: sessions_dir.clone(),
                     message: e.to_string(),
                 }
             })?;

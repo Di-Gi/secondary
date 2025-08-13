@@ -1,489 +1,467 @@
-// [[SECONDARY_MIND]]/src/components/error_recovery_manager.rs
-// Purpose: Error recovery manager with automatic recovery strategies and graceful degradation.
-// Architecture: Centralized error recovery with component-specific strategies and fallback mechanisms.
-// Dependencies: tokio, log, serde, chrono.
+// [[SECONDARY_MIND_CORE]]/src/components/error_recovery_manager.rs
+// Purpose: Error recovery manager with retry mechanisms and graceful degradation
+// Architecture: Centralized error recovery with configurable strategies
+// Dependencies: tokio, log, chrono
 
-use crate::errors::{SecondaryMindError, ErrorContext, ErrorSeverity, RecoveryStrategy};
+use crate::errors::{NavigationError, NavigationErrorContext, NavigationRecoveryStrategy, NavigationErrorSeverity};
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{RwLock, mpsc};
-use tokio::time::{sleep, Duration, Instant};
-use serde::{Deserialize, Serialize};
-use log::{error, warn, info, debug};
+use std::sync::{Arc, Mutex};
+use tokio::time::{sleep, Duration};
 use chrono::{DateTime, Utc};
-
-/// Error recovery manager that handles automatic recovery and graceful degradation
-pub struct ErrorRecoveryManager {
-    /// Component states for tracking degradation
-    component_states: Arc<RwLock<HashMap<String, ComponentState>>>,
-    /// Recovery attempt history
-    recovery_history: Arc<RwLock<Vec<RecoveryAttempt>>>,
-    /// Error event sender for UI notifications
-    error_sender: mpsc::UnboundedSender<ErrorEvent>,
-    /// Configuration for recovery behavior
-    config: RecoveryConfig,
-}
-
-/// State of a component for tracking degradation and recovery
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComponentState {
-    pub name: String,
-    pub status: ComponentStatus,
-    pub last_error: Option<ErrorContext>,
-    pub degradation_level: DegradationLevel,
-    pub recovery_attempts: u32,
-    pub last_recovery_attempt: Option<DateTime<Utc>>,
-    pub fallback_active: bool,
-}
-
-/// Component operational status
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum ComponentStatus {
-    /// Component is fully operational
-    Healthy,
-    /// Component is operational but with reduced functionality
-    Degraded,
-    /// Component is temporarily unavailable but recoverable
-    Impaired,
-    /// Component has failed and requires manual intervention
-    Failed,
-}
-
-/// Level of functionality degradation
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]
-pub enum DegradationLevel {
-    /// No degradation - full functionality
-    None,
-    /// Minor degradation - some features disabled
-    Minor,
-    /// Moderate degradation - significant features disabled
-    Moderate,
-    /// Severe degradation - minimal functionality only
-    Severe,
-    /// Complete degradation - component non-functional
-    Complete,
-}
-
-/// Record of a recovery attempt
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecoveryAttempt {
-    pub component: String,
-    pub error: SecondaryMindError,
-    pub strategy: RecoveryStrategy,
-    pub timestamp: DateTime<Utc>,
-    pub success: bool,
-    pub duration_ms: u64,
-    pub details: String,
-}
-
-/// Error event for UI notifications
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ErrorEvent {
-    pub context: ErrorContext,
-    pub recovery_status: RecoveryStatus,
-    pub user_action_required: bool,
-}
-
-/// Status of recovery operation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RecoveryStatus {
-    /// Recovery attempt in progress
-    InProgress,
-    /// Recovery successful
-    Success,
-    /// Recovery failed, will retry
-    FailedRetrying,
-    /// Recovery failed, manual intervention required
-    FailedManual,
-    /// Component degraded but operational
-    Degraded,
-}
+use log::{error, warn, info, debug};
 
 /// Configuration for error recovery behavior
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecoveryConfig {
-    /// Maximum recovery attempts per component per hour
-    pub max_recovery_attempts_per_hour: u32,
-    /// Minimum time between recovery attempts (seconds)
-    pub min_recovery_interval_seconds: u64,
-    /// Maximum time to wait for recovery (seconds)
-    pub max_recovery_timeout_seconds: u64,
-    /// Enable automatic degradation
-    pub enable_auto_degradation: bool,
-    /// Enable automatic recovery
-    pub enable_auto_recovery: bool,
+#[derive(Debug, Clone)]
+pub struct ErrorRecoveryConfig {
+    pub max_retry_attempts: u32,
+    pub base_backoff_ms: u64,
+    pub max_backoff_ms: u64,
+    pub enable_graceful_degradation: bool,
+    pub log_all_errors: bool,
+    pub track_error_patterns: bool,
 }
 
-impl Default for RecoveryConfig {
+impl Default for ErrorRecoveryConfig {
     fn default() -> Self {
         Self {
-            max_recovery_attempts_per_hour: 5,
-            min_recovery_interval_seconds: 30,
-            max_recovery_timeout_seconds: 300,
-            enable_auto_degradation: true,
-            enable_auto_recovery: true,
+            max_retry_attempts: 3,
+            base_backoff_ms: 1000,
+            max_backoff_ms: 30000,
+            enable_graceful_degradation: true,
+            log_all_errors: true,
+            track_error_patterns: true,
         }
     }
+}
+
+/// Statistics about error recovery operations
+#[derive(Debug, Clone)]
+pub struct ErrorRecoveryStats {
+    pub total_errors: u64,
+    pub successful_recoveries: u64,
+    pub failed_recoveries: u64,
+    pub degraded_operations: u64,
+    pub retry_attempts: u64,
+    pub last_error_time: Option<DateTime<Utc>>,
+}
+
+impl Default for ErrorRecoveryStats {
+    fn default() -> Self {
+        Self {
+            total_errors: 0,
+            successful_recoveries: 0,
+            failed_recoveries: 0,
+            degraded_operations: 0,
+            retry_attempts: 0,
+            last_error_time: None,
+        }
+    }
+}
+
+/// Error pattern tracking for identifying recurring issues
+#[derive(Debug, Clone)]
+pub struct ErrorPattern {
+    pub error_type: String,
+    pub component: String,
+    pub operation: String,
+    pub count: u32,
+    pub first_occurrence: DateTime<Utc>,
+    pub last_occurrence: DateTime<Utc>,
+    pub recovery_success_rate: f64,
+}
+
+/// Result of an error recovery attempt
+#[derive(Debug, Clone)]
+pub enum RecoveryResult<T> {
+    /// Operation succeeded after recovery
+    Success(T),
+    /// Operation succeeded with degraded functionality
+    Degraded(T, String),
+    /// Recovery failed, operation cannot continue
+    Failed(NavigationError),
+    /// Manual intervention required
+    ManualInterventionRequired(NavigationError, String),
+}
+
+/// Error recovery manager for navigation operations
+pub struct ErrorRecoveryManager {
+    config: ErrorRecoveryConfig,
+    stats: Arc<Mutex<ErrorRecoveryStats>>,
+    error_patterns: Arc<Mutex<HashMap<String, ErrorPattern>>>,
 }
 
 impl ErrorRecoveryManager {
     /// Create a new error recovery manager
-    pub fn new(error_sender: mpsc::UnboundedSender<ErrorEvent>) -> Self {
+    pub fn new(config: ErrorRecoveryConfig) -> Self {
         Self {
-            component_states: Arc::new(RwLock::new(HashMap::new())),
-            recovery_history: Arc::new(RwLock::new(Vec::new())),
-            error_sender,
-            config: RecoveryConfig::default(),
+            config,
+            stats: Arc::new(Mutex::new(ErrorRecoveryStats::default())),
+            error_patterns: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    /// Handle an error with automatic recovery
-    pub async fn handle_error(&self, mut context: ErrorContext) -> Result<RecoveryStatus, SecondaryMindError> {
-        let component = context.component.clone();
-        
-        // Update component state
-        self.update_component_state(&component, &context).await;
-        
-        // Check if recovery should be attempted
-        if !self.should_attempt_recovery(&component, &context).await {
-            return self.handle_degradation(&component, &context).await;
-        }
-
-        // Attempt recovery based on strategy
-        let recovery_status = match &context.recovery_strategy {
-            RecoveryStrategy::Retry { max_attempts, backoff_ms } => {
-                self.attempt_retry_recovery(&component, &context, *max_attempts, *backoff_ms).await
-            },
-            RecoveryStrategy::Fallback { alternative } => {
-                self.attempt_fallback_recovery(&component, &context, alternative).await
-            },
-            RecoveryStrategy::Degrade { limited_mode } => {
-                self.attempt_degradation_recovery(&component, &context, limited_mode).await
-            },
-            RecoveryStrategy::Reset { preserve_data } => {
-                self.attempt_reset_recovery(&component, &context, *preserve_data).await
-            },
-            RecoveryStrategy::Manual { instructions } => {
-                self.handle_manual_recovery(&component, &context, instructions).await
-            },
-            RecoveryStrategy::None => {
-                self.handle_no_recovery(&component, &context).await
-            },
-        };
-
-        // Record recovery attempt
-        self.record_recovery_attempt(&component, &context, &recovery_status).await;
-
-        // Send error event to UI
-        let error_event = ErrorEvent {
-            context,
-            recovery_status: recovery_status.clone(),
-            user_action_required: matches!(recovery_status, RecoveryStatus::FailedManual),
-        };
-        
-        if let Err(e) = self.error_sender.send(error_event) {
-            warn!("Failed to send error event to UI: {}", e);
-        }
-
-        Ok(recovery_status)
+    /// Create with default configuration
+    pub fn default() -> Self {
+        Self::new(ErrorRecoveryConfig::default())
     }
 
-    /// Check if recovery should be attempted for a component
-    async fn should_attempt_recovery(&self, component: &str, context: &ErrorContext) -> bool {
-        if !self.config.enable_auto_recovery {
-            return false;
-        }
+    /// Execute an operation with automatic error recovery
+    pub async fn execute_with_recovery<T, F, Fut>(
+        &self,
+        operation: F,
+        component: &str,
+        operation_name: &str,
+    ) -> RecoveryResult<T>
+    where
+        F: Fn() -> Fut,
+        Fut: std::future::Future<Output = Result<T, NavigationError>>,
+    {
+        let mut retry_count = 0;
+        let mut last_error = None;
 
-        let states = self.component_states.read().await;
-        if let Some(state) = states.get(component) {
-            // Check recovery attempt limits
-            if state.recovery_attempts >= self.config.max_recovery_attempts_per_hour {
-                return false;
-            }
+        loop {
+            match operation().await {
+                Ok(result) => {
+                    if retry_count > 0 {
+                        self.record_successful_recovery(component, operation_name, retry_count);
+                        info!("Operation '{}' in '{}' succeeded after {} retries", operation_name, component, retry_count);
+                    }
+                    return RecoveryResult::Success(result);
+                }
+                Err(error) => {
+                    last_error = Some(error.clone());
+                    self.record_error(&error, component, operation_name);
 
-            // Check minimum interval between attempts
-            if let Some(last_attempt) = state.last_recovery_attempt {
-                let elapsed = Utc::now().signed_duration_since(last_attempt);
-                if elapsed.num_seconds() < self.config.min_recovery_interval_seconds as i64 {
-                    return false;
+                    let context = error.to_context(component, operation_name);
+                    
+                    // Log the error
+                    if self.config.log_all_errors {
+                        self.log_error(&context, retry_count);
+                    }
+
+                    // Check if we should attempt recovery
+                    match self.should_attempt_recovery(&error, retry_count) {
+                        Some(strategy) => {
+                            match self.attempt_recovery(&error, &strategy, retry_count).await {
+                                RecoveryAction::Retry => {
+                                    retry_count += 1;
+                                    continue;
+                                }
+                                RecoveryAction::Degrade(fallback_result) => {
+                                    self.record_degraded_operation(component, operation_name);
+                                    return RecoveryResult::Degraded(fallback_result, context.user_message);
+                                }
+                                RecoveryAction::Fail => {
+                                    self.record_failed_recovery(component, operation_name);
+                                    return RecoveryResult::Failed(error);
+                                }
+                                RecoveryAction::ManualIntervention(instructions) => {
+                                    return RecoveryResult::ManualInterventionRequired(error, instructions);
+                                }
+                            }
+                        }
+                        None => {
+                            self.record_failed_recovery(component, operation_name);
+                            return RecoveryResult::Failed(error);
+                        }
+                    }
                 }
             }
-
-            // Don't attempt recovery for already failed components
-            if state.status == ComponentStatus::Failed {
-                return false;
-            }
         }
-
-        // Don't attempt recovery for low severity errors that can be degraded
-        if context.severity == ErrorSeverity::Low && self.config.enable_auto_degradation {
-            return false;
-        }
-
-        true
     }
 
-    /// Attempt retry-based recovery
-    async fn attempt_retry_recovery(
+    /// Execute an operation with fallback value on error
+    pub async fn execute_with_fallback<T, F, Fut>(
         &self,
+        operation: F,
+        fallback: T,
         component: &str,
-        context: &ErrorContext,
-        max_attempts: u32,
-        backoff_ms: u64,
-    ) -> RecoveryStatus {
-        info!("Attempting retry recovery for {} (max_attempts: {}, backoff: {}ms)", component, max_attempts, backoff_ms);
+        operation_name: &str,
+    ) -> RecoveryResult<T>
+    where
+        F: Fn() -> Fut,
+        Fut: std::future::Future<Output = Result<T, NavigationError>>,
+        T: Clone,
+    {
+        match self.execute_with_recovery(operation, component, operation_name).await {
+            RecoveryResult::Success(result) => RecoveryResult::Success(result),
+            RecoveryResult::Degraded(result, message) => RecoveryResult::Degraded(result, message),
+            RecoveryResult::Failed(error) => {
+                if self.config.enable_graceful_degradation && error.can_continue() {
+                    warn!("Using fallback value for '{}' in '{}' due to error: {}", operation_name, component, error.user_message());
+                    RecoveryResult::Degraded(fallback, "Using fallback data due to error".to_string())
+                } else {
+                    RecoveryResult::Failed(error)
+                }
+            }
+            RecoveryResult::ManualInterventionRequired(error, instructions) => {
+                RecoveryResult::ManualInterventionRequired(error, instructions)
+            }
+        }
+    }
 
-        for attempt in 1..=max_attempts {
-            debug!("Retry attempt {} for {}", attempt, component);
+    /// Check if recovery should be attempted for this error
+    fn should_attempt_recovery(&self, error: &NavigationError, retry_count: u32) -> Option<NavigationRecoveryStrategy> {
+        if retry_count >= self.config.max_retry_attempts {
+            return None;
+        }
+
+        match error.severity() {
+            NavigationErrorSeverity::Critical => None, // No recovery for critical errors
+            _ => Some(error.recovery_strategy()),
+        }
+    }
+
+    /// Attempt recovery based on the strategy
+    async fn attempt_recovery<T>(
+        &self,
+        error: &NavigationError,
+        strategy: &NavigationRecoveryStrategy,
+        retry_count: u32,
+    ) -> RecoveryAction<T> {
+        match strategy {
+            NavigationRecoveryStrategy::Retry { max_attempts, backoff_ms } => {
+                if retry_count < *max_attempts {
+                    let backoff = self.calculate_backoff(*backoff_ms, retry_count);
+                    debug!("Retrying operation after {}ms (attempt {})", backoff, retry_count + 1);
+                    sleep(Duration::from_millis(backoff)).await;
+                    RecoveryAction::Retry
+                } else {
+                    RecoveryAction::Fail
+                }
+            }
+            NavigationRecoveryStrategy::Fallback { fallback_type } => {
+                info!("Using fallback strategy: {}", fallback_type);
+                // Note: Actual fallback implementation would depend on the specific operation
+                // This is a placeholder that indicates degraded functionality
+                RecoveryAction::Fail // Would be replaced with actual fallback logic
+            }
+            NavigationRecoveryStrategy::Degrade { limited_functionality } => {
+                warn!("Degrading functionality: {}", limited_functionality);
+                // Note: Actual degradation would return a limited version of the result
+                RecoveryAction::Fail // Would be replaced with actual degraded result
+            }
+            NavigationRecoveryStrategy::Reset { preserve_cache: _ } => {
+                info!("Resetting component state");
+                // Note: Actual reset logic would be implemented here
+                RecoveryAction::Retry
+            }
+            NavigationRecoveryStrategy::Skip { continue_operation } => {
+                if *continue_operation {
+                    info!("Skipping failed operation and continuing");
+                    RecoveryAction::Fail // Would return a "skipped" result in practice
+                } else {
+                    RecoveryAction::Fail
+                }
+            }
+            NavigationRecoveryStrategy::Manual { instructions } => {
+                RecoveryAction::ManualIntervention(instructions.clone())
+            }
+            NavigationRecoveryStrategy::None => RecoveryAction::Fail,
+        }
+    }
+
+    /// Calculate exponential backoff with jitter
+    fn calculate_backoff(&self, base_backoff_ms: u64, retry_count: u32) -> u64 {
+        let exponential_backoff = base_backoff_ms * (2_u64.pow(retry_count));
+        let capped_backoff = exponential_backoff.min(self.config.max_backoff_ms);
+        
+        // Add jitter to prevent thundering herd
+        let jitter = (capped_backoff as f64 * 0.1 * rand::random::<f64>()) as u64;
+        capped_backoff + jitter
+    }
+
+    /// Record error occurrence and update patterns
+    fn record_error(&self, error: &NavigationError, component: &str, operation: &str) {
+        let mut stats = self.stats.lock().unwrap();
+        stats.total_errors += 1;
+        stats.last_error_time = Some(Utc::now());
+
+        if self.config.track_error_patterns {
+            let mut patterns = self.error_patterns.lock().unwrap();
+            let error_key = format!("{}:{}:{:?}", component, operation, std::mem::discriminant(error));
             
-            // Wait with exponential backoff
-            let delay = backoff_ms * (2_u64.pow(attempt - 1));
-            sleep(Duration::from_millis(delay)).await;
+            let pattern = patterns.entry(error_key).or_insert_with(|| ErrorPattern {
+                error_type: format!("{:?}", std::mem::discriminant(error)),
+                component: component.to_string(),
+                operation: operation.to_string(),
+                count: 0,
+                first_occurrence: Utc::now(),
+                last_occurrence: Utc::now(),
+                recovery_success_rate: 0.0,
+            });
+            
+            pattern.count += 1;
+            pattern.last_occurrence = Utc::now();
+        }
+    }
 
-            // Simulate recovery attempt (in real implementation, this would call the actual recovery function)
-            if self.simulate_recovery_attempt(component, context).await {
-                info!("Retry recovery successful for {} after {} attempts", component, attempt);
-                self.set_component_status(component, ComponentStatus::Healthy, DegradationLevel::None).await;
-                return RecoveryStatus::Success;
+    /// Record successful recovery
+    fn record_successful_recovery(&self, component: &str, operation: &str, retry_count: u32) {
+        let mut stats = self.stats.lock().unwrap();
+        stats.successful_recoveries += 1;
+        stats.retry_attempts += retry_count as u64;
+
+        if self.config.track_error_patterns {
+            self.update_recovery_success_rate(component, operation, true);
+        }
+    }
+
+    /// Record failed recovery
+    fn record_failed_recovery(&self, component: &str, operation: &str) {
+        let mut stats = self.stats.lock().unwrap();
+        stats.failed_recoveries += 1;
+
+        if self.config.track_error_patterns {
+            self.update_recovery_success_rate(component, operation, false);
+        }
+    }
+
+    /// Record degraded operation
+    fn record_degraded_operation(&self, _component: &str, _operation: &str) {
+        let mut stats = self.stats.lock().unwrap();
+        stats.degraded_operations += 1;
+    }
+
+    /// Update recovery success rate for error patterns
+    fn update_recovery_success_rate(&self, component: &str, operation: &str, success: bool) {
+        let mut patterns = self.error_patterns.lock().unwrap();
+        for pattern in patterns.values_mut() {
+            if pattern.component == component && pattern.operation == operation {
+                let total_attempts = if success { 
+                    pattern.recovery_success_rate * pattern.count as f64 + 1.0 
+                } else { 
+                    pattern.recovery_success_rate * pattern.count as f64 
+                };
+                pattern.recovery_success_rate = total_attempts / pattern.count as f64;
             }
         }
-
-        warn!("Retry recovery failed for {} after {} attempts", component, max_attempts);
-        RecoveryStatus::FailedRetrying
     }
 
-    /// Attempt fallback recovery
-    async fn attempt_fallback_recovery(
-        &self,
-        component: &str,
-        context: &ErrorContext,
-        alternative: &str,
-    ) -> RecoveryStatus {
-        info!("Attempting fallback recovery for {} using alternative: {}", component, alternative);
-
-        // Simulate fallback activation
-        if self.activate_fallback(component, alternative).await {
-            info!("Fallback recovery successful for {}", component);
-            self.set_component_status(component, ComponentStatus::Degraded, DegradationLevel::Minor).await;
-            return RecoveryStatus::Degraded;
-        }
-
-        warn!("Fallback recovery failed for {}", component);
-        RecoveryStatus::FailedRetrying
-    }
-
-    /// Attempt degradation recovery
-    async fn attempt_degradation_recovery(
-        &self,
-        component: &str,
-        context: &ErrorContext,
-        limited_mode: &str,
-    ) -> RecoveryStatus {
-        info!("Attempting degradation recovery for {} with limited mode: {}", component, limited_mode);
-
-        let degradation_level = self.determine_degradation_level(context.severity);
-        self.set_component_status(component, ComponentStatus::Degraded, degradation_level).await;
-
-        info!("Component {} degraded to {:?} level", component, degradation_level);
-        RecoveryStatus::Degraded
-    }
-
-    /// Attempt reset recovery
-    async fn attempt_reset_recovery(
-        &self,
-        component: &str,
-        context: &ErrorContext,
-        preserve_data: bool,
-    ) -> RecoveryStatus {
-        info!("Attempting reset recovery for {} (preserve_data: {})", component, preserve_data);
-
-        // Simulate component reset
-        if self.reset_component(component, preserve_data).await {
-            info!("Reset recovery successful for {}", component);
-            self.set_component_status(component, ComponentStatus::Healthy, DegradationLevel::None).await;
-            return RecoveryStatus::Success;
-        }
-
-        warn!("Reset recovery failed for {}", component);
-        RecoveryStatus::FailedManual
-    }
-
-    /// Handle manual recovery requirement
-    async fn handle_manual_recovery(
-        &self,
-        component: &str,
-        context: &ErrorContext,
-        instructions: &str,
-    ) -> RecoveryStatus {
-        warn!("Manual recovery required for {}: {}", component, instructions);
-        self.set_component_status(component, ComponentStatus::Failed, DegradationLevel::Complete).await;
-        RecoveryStatus::FailedManual
-    }
-
-    /// Handle no recovery option
-    async fn handle_no_recovery(
-        &self,
-        component: &str,
-        context: &ErrorContext,
-    ) -> RecoveryStatus {
-        warn!("No recovery available for {}", component);
-        let degradation_level = self.determine_degradation_level(context.severity);
-        self.set_component_status(component, ComponentStatus::Impaired, degradation_level).await;
-        RecoveryStatus::Degraded
-    }
-
-    /// Handle degradation when recovery is not attempted
-    async fn handle_degradation(
-        &self,
-        component: &str,
-        context: &ErrorContext,
-    ) -> Result<RecoveryStatus, SecondaryMindError> {
-        if self.config.enable_auto_degradation {
-            let degradation_level = self.determine_degradation_level(context.severity);
-            self.set_component_status(component, ComponentStatus::Degraded, degradation_level).await;
-            info!("Component {} automatically degraded to {:?} level", component, degradation_level);
-            Ok(RecoveryStatus::Degraded)
+    /// Log error with appropriate level based on severity
+    fn log_error(&self, context: &NavigationErrorContext, retry_count: u32) {
+        let retry_info = if retry_count > 0 {
+            format!(" (retry {})", retry_count)
         } else {
-            self.set_component_status(component, ComponentStatus::Failed, DegradationLevel::Complete).await;
-            Ok(RecoveryStatus::FailedManual)
-        }
-    }
-
-    /// Update component state with error information
-    async fn update_component_state(&self, component: &str, context: &ErrorContext) {
-        let mut states = self.component_states.write().await;
-        let state = states.entry(component.to_string()).or_insert_with(|| ComponentState {
-            name: component.to_string(),
-            status: ComponentStatus::Healthy,
-            last_error: None,
-            degradation_level: DegradationLevel::None,
-            recovery_attempts: 0,
-            last_recovery_attempt: None,
-            fallback_active: false,
-        });
-
-        state.last_error = Some(context.clone());
-        state.recovery_attempts += 1;
-        state.last_recovery_attempt = Some(Utc::now());
-    }
-
-    /// Set component status and degradation level
-    async fn set_component_status(&self, component: &str, status: ComponentStatus, degradation: DegradationLevel) {
-        let mut states = self.component_states.write().await;
-        if let Some(state) = states.get_mut(component) {
-            state.status = status;
-            state.degradation_level = degradation;
-        }
-    }
-
-    /// Determine degradation level based on error severity
-    fn determine_degradation_level(&self, severity: ErrorSeverity) -> DegradationLevel {
-        match severity {
-            ErrorSeverity::Low => DegradationLevel::Minor,
-            ErrorSeverity::Medium => DegradationLevel::Moderate,
-            ErrorSeverity::High => DegradationLevel::Severe,
-            ErrorSeverity::Critical => DegradationLevel::Complete,
-        }
-    }
-
-    /// Record a recovery attempt
-    async fn record_recovery_attempt(&self, component: &str, context: &ErrorContext, status: &RecoveryStatus) {
-        let mut history = self.recovery_history.write().await;
-        let attempt = RecoveryAttempt {
-            component: component.to_string(),
-            error: context.error.clone(),
-            strategy: context.recovery_strategy.clone(),
-            timestamp: Utc::now(),
-            success: matches!(status, RecoveryStatus::Success),
-            duration_ms: 0, // Would be calculated in real implementation
-            details: format!("Recovery status: {:?}", status),
+            String::new()
         };
-        history.push(attempt);
 
-        // Keep only recent history (last 100 attempts)
-        if history.len() > 100 {
-            let excess = history.len() - 100;
-            history.drain(0..excess);
+        match context.severity {
+            NavigationErrorSeverity::Critical => {
+                error!("CRITICAL ERROR in {}.{}{}: {} - {}", 
+                    context.component, context.operation, retry_info, 
+                    context.user_message, context.technical_details);
+            }
+            NavigationErrorSeverity::High => {
+                error!("HIGH SEVERITY in {}.{}{}: {}", 
+                    context.component, context.operation, retry_info, context.user_message);
+            }
+            NavigationErrorSeverity::Medium => {
+                warn!("MEDIUM SEVERITY in {}.{}{}: {}", 
+                    context.component, context.operation, retry_info, context.user_message);
+            }
+            NavigationErrorSeverity::Low => {
+                info!("LOW SEVERITY in {}.{}{}: {}", 
+                    context.component, context.operation, retry_info, context.user_message);
+            }
         }
     }
 
-    /// Get current component states
-    pub async fn get_component_states(&self) -> HashMap<String, ComponentState> {
-        self.component_states.read().await.clone()
+    /// Get current error recovery statistics
+    pub fn get_stats(&self) -> ErrorRecoveryStats {
+        self.stats.lock().unwrap().clone()
     }
 
-    /// Get recovery history
-    pub async fn get_recovery_history(&self) -> Vec<RecoveryAttempt> {
-        self.recovery_history.read().await.clone()
+    /// Get error patterns for analysis
+    pub fn get_error_patterns(&self) -> HashMap<String, ErrorPattern> {
+        self.error_patterns.lock().unwrap().clone()
     }
 
-    /// Simulate recovery attempt (placeholder for actual recovery logic)
-    async fn simulate_recovery_attempt(&self, _component: &str, _context: &ErrorContext) -> bool {
-        // In real implementation, this would call the actual recovery function
-        // For now, simulate 70% success rate
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        rng.gen_bool(0.7)
-    }
-
-    /// Activate fallback mechanism (placeholder)
-    async fn activate_fallback(&self, component: &str, _alternative: &str) -> bool {
-        // In real implementation, this would activate the fallback mechanism
-        let mut states = self.component_states.write().await;
-        if let Some(state) = states.get_mut(component) {
-            state.fallback_active = true;
-        }
-        true
-    }
-
-    /// Reset component (placeholder)
-    async fn reset_component(&self, _component: &str, _preserve_data: bool) -> bool {
-        // In real implementation, this would reset the component
-        true
+    /// Reset statistics and patterns
+    pub fn reset_stats(&self) {
+        let mut stats = self.stats.lock().unwrap();
+        *stats = ErrorRecoveryStats::default();
+        
+        let mut patterns = self.error_patterns.lock().unwrap();
+        patterns.clear();
     }
 }
+
+/// Internal enum for recovery actions
+enum RecoveryAction<T> {
+    Retry,
+    Degrade(T),
+    Fail,
+    ManualIntervention(String),
+}
+
+// Add rand dependency for jitter calculation
+use rand;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::sync::mpsc;
+    use tokio::test;
 
-    #[tokio::test]
-    async fn test_error_recovery_manager_creation() {
-        let (sender, _receiver) = mpsc::unbounded_channel();
-        let manager = ErrorRecoveryManager::new(sender);
+    #[test]
+    async fn test_successful_operation() {
+        let manager = ErrorRecoveryManager::default();
         
-        let states = manager.get_component_states().await;
-        assert!(states.is_empty());
+        let result = manager.execute_with_recovery(
+            || async { Ok::<i32, NavigationError>(42) },
+            "test_component",
+            "test_operation"
+        ).await;
+        
+        match result {
+            RecoveryResult::Success(value) => assert_eq!(value, 42),
+            _ => panic!("Expected success"),
+        }
     }
 
-    #[tokio::test]
-    async fn test_component_state_update() {
-        let (sender, _receiver) = mpsc::unbounded_channel();
-        let manager = ErrorRecoveryManager::new(sender);
+    #[test]
+    async fn test_retry_mechanism() {
+        let manager = ErrorRecoveryManager::default();
+        let mut attempt_count = 0;
         
-        let error = SecondaryMindError::CacheError {
-            operation: "read".to_string(),
-            key: "test".to_string(),
-            reason: "timeout".to_string(),
-        };
-        let context = error.to_context("cache", "read_operation");
+        let result = manager.execute_with_recovery(
+            || {
+                attempt_count += 1;
+                async move {
+                    if attempt_count < 3 {
+                        Err(NavigationError::analysis_timeout(1000, "test".to_string()))
+                    } else {
+                        Ok(42)
+                    }
+                }
+            },
+            "test_component",
+            "test_operation"
+        ).await;
         
-        manager.update_component_state("cache", &context).await;
-        
-        let states = manager.get_component_states().await;
-        assert!(states.contains_key("cache"));
-        assert_eq!(states["cache"].recovery_attempts, 1);
+        match result {
+            RecoveryResult::Success(value) => {
+                assert_eq!(value, 42);
+                assert_eq!(attempt_count, 3);
+            }
+            _ => panic!("Expected success after retries"),
+        }
     }
 
-    #[tokio::test]
-    async fn test_degradation_level_determination() {
-        let (sender, _receiver) = mpsc::unbounded_channel();
-        let manager = ErrorRecoveryManager::new(sender);
+    #[test]
+    async fn test_fallback_mechanism() {
+        let manager = ErrorRecoveryManager::default();
         
-        assert_eq!(manager.determine_degradation_level(ErrorSeverity::Low), DegradationLevel::Minor);
-        assert_eq!(manager.determine_degradation_level(ErrorSeverity::Medium), DegradationLevel::Moderate);
-        assert_eq!(manager.determine_degradation_level(ErrorSeverity::High), DegradationLevel::Severe);
-        assert_eq!(manager.determine_degradation_level(ErrorSeverity::Critical), DegradationLevel::Complete);
+        let result = manager.execute_with_fallback(
+            || async { Err::<i32, NavigationError>(NavigationError::file_not_found(std::path::PathBuf::from("test.txt"))) },
+            99,
+            "test_component",
+            "test_operation"
+        ).await;
+        
+        match result {
+            RecoveryResult::Degraded(value, _) => assert_eq!(value, 99),
+            _ => panic!("Expected degraded result with fallback value"),
+        }
     }
 }

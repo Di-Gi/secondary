@@ -8,3 +8,5 @@ pub mod symbol;
 pub mod command;
 pub mod llm; // New model for LLM API data structures
 pub mod session; // Session management models
+pub mod navigation; // Navigation history and session models
+pub mod navigation_session; // Navigation-specific session data structures

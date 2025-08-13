@@ -99,6 +99,36 @@ pub struct GoToDefinitionResult {
     pub alternatives: Vec<Symbol>,
 }
 
+/// Result of relationship analysis for navigation cache
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelationshipAnalysis {
+    pub center_symbol: Symbol,
+    pub relationships: Vec<SymbolRelationship>,
+    pub analysis_depth: usize,
+    pub total_connections: usize,
+}
+
+/// Symbol relationship for navigation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolRelationship {
+    pub relationship_type: RelationshipType,
+    pub source: Symbol,
+    pub target: Symbol,
+    pub strength: f64,
+    pub locations: Vec<SymbolLocation>,
+}
+
+/// Relationship types for navigation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RelationshipType {
+    Calls,
+    References,
+    Inherits,
+    Implements,
+    Uses,
+    Defines,
+}
+
 /// Statistics about symbol usage patterns
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SymbolUsageStats {
@@ -661,6 +691,165 @@ impl SymbolRelationshipTracker {
             },
         }
     }
+
+    /// Enhanced relationship analysis with configurable depth
+    pub fn analyze_relationships_with_depth(&self, symbol_id: &str, max_depth: usize) -> RelationshipAnalysisResult {
+        use std::collections::{HashSet, VecDeque};
+        
+        let mut relationships = Vec::new();
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        
+        // Start with the center symbol
+        queue.push_back((symbol_id.to_string(), 0));
+        visited.insert(symbol_id.to_string());
+        
+        while let Some((current_symbol_id, current_depth)) = queue.pop_front() {
+            if current_depth >= max_depth {
+                continue;
+            }
+            
+            // Get dependencies (symbols this symbol depends on)
+            let dependencies = self.get_dependencies(&current_symbol_id);
+            for dep_id in dependencies {
+                if !visited.contains(&dep_id) {
+                    visited.insert(dep_id.clone());
+                    queue.push_back((dep_id.clone(), current_depth + 1));
+                    
+                    // Calculate relationship strength
+                    let strength = self.calculate_relationship_strength(&current_symbol_id, &dep_id);
+                    
+                    relationships.push(EnhancedSymbolRelationship {
+                        source_id: current_symbol_id.clone(),
+                        target_id: dep_id.clone(),
+                        relationship_type: EnhancedRelationshipType::DependsOn,
+                        strength,
+                        depth: current_depth + 1,
+                        reference_count: self.count_references_between(&current_symbol_id, &dep_id),
+                    });
+                }
+            }
+            
+            // Get dependents (symbols that depend on this symbol)
+            let dependents = self.get_dependents(&current_symbol_id);
+            for dependent_id in dependents {
+                if !visited.contains(&dependent_id) {
+                    visited.insert(dependent_id.clone());
+                    queue.push_back((dependent_id.clone(), current_depth + 1));
+                    
+                    // Calculate relationship strength
+                    let strength = self.calculate_relationship_strength(&dependent_id, &current_symbol_id);
+                    
+                    relationships.push(EnhancedSymbolRelationship {
+                        source_id: dependent_id.clone(),
+                        target_id: current_symbol_id.clone(),
+                        relationship_type: EnhancedRelationshipType::DependsOn,
+                        strength,
+                        depth: current_depth + 1,
+                        reference_count: self.count_references_between(&dependent_id, &current_symbol_id),
+                    });
+                }
+            }
+        }
+        
+        RelationshipAnalysisResult {
+            center_symbol_id: symbol_id.to_string(),
+            relationships,
+            analysis_depth: max_depth,
+            total_symbols_analyzed: visited.len(),
+        }
+    }
+
+    /// Calculate relationship strength between two symbols based on usage frequency
+    pub fn calculate_relationship_strength(&self, source_id: &str, target_id: &str) -> f64 {
+        // Base strength from dependency existence
+        let mut strength = 0.3;
+        
+        // Add strength based on reference count
+        if let Some(refs) = self.symbol_references.get(target_id) {
+            let source_refs = refs.iter()
+                .filter(|r| r.location.path.to_string_lossy().contains(&source_id.split(':').next().unwrap_or("")))
+                .count();
+            
+            // Normalize reference count to 0-0.5 range
+            strength += (source_refs as f64 / 10.0).min(0.5);
+        }
+        
+        // Add strength based on usage statistics
+        if let Some(stats) = self.usage_stats.get(target_id) {
+            // Factor in popularity score
+            strength += stats.popularity_score * 0.2;
+        }
+        
+        // Ensure strength is between 0.0 and 1.0
+        strength.min(1.0).max(0.0)
+    }
+
+    /// Count references between two symbols
+    fn count_references_between(&self, source_id: &str, target_id: &str) -> usize {
+        if let Some(refs) = self.symbol_references.get(target_id) {
+            refs.iter()
+                .filter(|r| r.location.path.to_string_lossy().contains(&source_id.split(':').next().unwrap_or("")))
+                .count()
+        } else {
+            0
+        }
+    }
+
+    /// Get all dependency relationships with metadata
+    pub fn get_dependency_relationships(&self) -> &Vec<SymbolDependency> {
+        &self.dependency_relationships
+    }
+
+    /// Find symbols by pattern matching
+    pub fn find_symbols_by_pattern(&self, pattern: &str) -> Vec<String> {
+        let pattern_lower = pattern.to_lowercase();
+        
+        self.symbol_definitions
+            .keys()
+            .filter(|symbol_id| {
+                let symbol_name = symbol_id.split(':').nth(1).unwrap_or("");
+                symbol_name.to_lowercase().contains(&pattern_lower)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Get relationship statistics for a symbol
+    pub fn get_relationship_stats(&self, symbol_id: &str) -> RelationshipStats {
+        let dependencies = self.get_dependencies(symbol_id);
+        let dependents = self.get_dependents(symbol_id);
+        let references = self.symbol_references.get(symbol_id).map(|r| r.len()).unwrap_or(0);
+        
+        RelationshipStats {
+            dependency_count: dependencies.len(),
+            dependent_count: dependents.len(),
+            reference_count: references,
+            coupling_score: self.calculate_coupling_score(symbol_id),
+            cohesion_score: self.calculate_cohesion_score(symbol_id),
+        }
+    }
+
+    /// Calculate coupling score (how much this symbol depends on others)
+    fn calculate_coupling_score(&self, symbol_id: &str) -> f64 {
+        let dependencies = self.get_dependencies(symbol_id);
+        // Normalize to 0-1 scale, where 0 is low coupling, 1 is high coupling
+        (dependencies.len() as f64 / 20.0).min(1.0)
+    }
+
+    /// Calculate cohesion score (how focused this symbol is)
+    fn calculate_cohesion_score(&self, symbol_id: &str) -> f64 {
+        if let Some(stats) = self.usage_stats.get(symbol_id) {
+            // High cohesion if symbol has consistent usage patterns
+            let type_diversity = stats.reference_types.len() as f64;
+            let max_types = 6.0; // Maximum reference types
+            
+            // Inverse relationship: fewer types = higher cohesion
+            1.0 - (type_diversity / max_types).min(1.0)
+        } else {
+            0.5 // Default cohesion
+        }
+    }
 }
 
 /// Statistics about the relationship tracker
@@ -671,6 +860,51 @@ pub struct RelationshipTrackerStats {
     pub total_dependencies: usize,
     pub files_tracked: usize,
     pub avg_references_per_symbol: f64,
+}
+
+/// Enhanced relationship analysis result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelationshipAnalysisResult {
+    pub center_symbol_id: String,
+    pub relationships: Vec<EnhancedSymbolRelationship>,
+    pub analysis_depth: usize,
+    pub total_symbols_analyzed: usize,
+}
+
+/// Enhanced symbol relationship with additional metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnhancedSymbolRelationship {
+    pub source_id: String,
+    pub target_id: String,
+    pub relationship_type: EnhancedRelationshipType,
+    pub strength: f64,
+    pub depth: usize,
+    pub reference_count: usize,
+}
+
+/// Enhanced relationship types for analysis
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum EnhancedRelationshipType {
+    DependsOn,
+    UsedBy,
+    Calls,
+    CalledBy,
+    Inherits,
+    InheritedBy,
+    Implements,
+    ImplementedBy,
+    References,
+    ReferencedBy,
+}
+
+/// Relationship statistics for a symbol
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelationshipStats {
+    pub dependency_count: usize,
+    pub dependent_count: usize,
+    pub reference_count: usize,
+    pub coupling_score: f64,
+    pub cohesion_score: f64,
 }
 
 impl PartialEq for SymbolLocation {
@@ -828,6 +1062,106 @@ mod tests {
         
         assert!(a_pos < b_pos);
         assert!(b_pos < c_pos);
+    }
+
+    #[test]
+    fn test_analyze_relationships_with_depth() {
+        let mut tracker = SymbolRelationshipTracker::new();
+        
+        // Create a chain of symbols: A -> B -> C -> D
+        let symbol_a = create_test_symbol("A", SymbolKind::Function, "src/a.rs", 1);
+        let symbol_b = create_test_symbol("B", SymbolKind::Function, "src/b.rs", 1);
+        let symbol_c = create_test_symbol("C", SymbolKind::Function, "src/c.rs", 1);
+        let symbol_d = create_test_symbol("D", SymbolKind::Function, "src/d.rs", 1);
+        
+        let symbol_id_a = tracker.generate_symbol_id(&symbol_a);
+        let symbol_id_b = tracker.generate_symbol_id(&symbol_b);
+        let symbol_id_c = tracker.generate_symbol_id(&symbol_c);
+        let symbol_id_d = tracker.generate_symbol_id(&symbol_d);
+        
+        tracker.add_symbol_definition(symbol_a).unwrap();
+        tracker.add_symbol_definition(symbol_b).unwrap();
+        tracker.add_symbol_definition(symbol_c).unwrap();
+        tracker.add_symbol_definition(symbol_d).unwrap();
+        
+        // Add dependencies: A -> B -> C -> D
+        tracker.add_dependency(&symbol_id_a, &symbol_id_b, DependencyType::Calls).unwrap();
+        tracker.add_dependency(&symbol_id_b, &symbol_id_c, DependencyType::Calls).unwrap();
+        tracker.add_dependency(&symbol_id_c, &symbol_id_d, DependencyType::Calls).unwrap();
+        
+        // Test depth 1 analysis
+        let result = tracker.analyze_relationships_with_depth(&symbol_id_a, 1);
+        assert_eq!(result.center_symbol_id, symbol_id_a);
+        assert_eq!(result.analysis_depth, 1);
+        assert!(result.relationships.len() >= 1); // Should find at least A -> B
+        
+        // Test depth 2 analysis
+        let result = tracker.analyze_relationships_with_depth(&symbol_id_a, 2);
+        assert_eq!(result.analysis_depth, 2);
+        assert!(result.relationships.len() >= 2); // Should find A -> B -> C
+        
+        // Test depth 3 analysis
+        let result = tracker.analyze_relationships_with_depth(&symbol_id_a, 3);
+        assert_eq!(result.analysis_depth, 3);
+        assert!(result.relationships.len() >= 3); // Should find A -> B -> C -> D
+    }
+
+    #[test]
+    fn test_calculate_relationship_strength() {
+        let mut tracker = SymbolRelationshipTracker::new();
+        
+        let symbol_a = create_test_symbol("A", SymbolKind::Function, "src/a.rs", 1);
+        let symbol_b = create_test_symbol("B", SymbolKind::Function, "src/b.rs", 1);
+        
+        let symbol_id_a = tracker.generate_symbol_id(&symbol_a);
+        let symbol_id_b = tracker.generate_symbol_id(&symbol_b);
+        
+        tracker.add_symbol_definition(symbol_a).unwrap();
+        tracker.add_symbol_definition(symbol_b).unwrap();
+        
+        // Add dependency
+        tracker.add_dependency(&symbol_id_a, &symbol_id_b, DependencyType::Calls).unwrap();
+        
+        // Add some references to increase strength
+        let ref1 = create_test_reference(&symbol_id_b, "src/a.rs", 5, ReferenceType::Call);
+        let ref2 = create_test_reference(&symbol_id_b, "src/a.rs", 10, ReferenceType::Call);
+        
+        tracker.add_symbol_reference(ref1).unwrap();
+        tracker.add_symbol_reference(ref2).unwrap();
+        
+        let strength = tracker.calculate_relationship_strength(&symbol_id_a, &symbol_id_b);
+        assert!(strength > 0.3); // Should be higher than base strength due to references
+        assert!(strength <= 1.0); // Should not exceed maximum
+    }
+
+    #[test]
+    fn test_get_relationship_stats() {
+        let mut tracker = SymbolRelationshipTracker::new();
+        
+        let symbol_a = create_test_symbol("A", SymbolKind::Function, "src/a.rs", 1);
+        let symbol_b = create_test_symbol("B", SymbolKind::Function, "src/b.rs", 1);
+        let symbol_c = create_test_symbol("C", SymbolKind::Function, "src/c.rs", 1);
+        
+        let symbol_id_a = tracker.generate_symbol_id(&symbol_a);
+        let symbol_id_b = tracker.generate_symbol_id(&symbol_b);
+        let symbol_id_c = tracker.generate_symbol_id(&symbol_c);
+        
+        tracker.add_symbol_definition(symbol_a).unwrap();
+        tracker.add_symbol_definition(symbol_b).unwrap();
+        tracker.add_symbol_definition(symbol_c).unwrap();
+        
+        // A depends on B and C
+        tracker.add_dependency(&symbol_id_a, &symbol_id_b, DependencyType::Calls).unwrap();
+        tracker.add_dependency(&symbol_id_a, &symbol_id_c, DependencyType::Calls).unwrap();
+        
+        // B depends on A (making A also a dependent)
+        tracker.add_dependency(&symbol_id_b, &symbol_id_a, DependencyType::Uses).unwrap();
+        
+        let stats = tracker.get_relationship_stats(&symbol_id_a);
+        assert_eq!(stats.dependency_count, 2); // A depends on B and C
+        assert_eq!(stats.dependent_count, 1);  // B depends on A
+        assert!(stats.coupling_score >= 0.0 && stats.coupling_score <= 1.0);
+        assert!(stats.cohesion_score >= 0.0 && stats.cohesion_score <= 1.0);
     }
 
     #[test]

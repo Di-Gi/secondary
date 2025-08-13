@@ -696,6 +696,7 @@ impl SearchEngine {
 mod tests {
     use super::*;
     use crate::model::symbol::SymbolLocation;
+    use crate::components::search_index_manager::SearchResult;
     use std::path::PathBuf;
 
     fn create_test_symbol(name: &str, kind: SymbolKind, file: &str) -> Symbol {

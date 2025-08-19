@@ -18,8 +18,8 @@ pub enum NavigationError {
     #[error("Permission denied: {path}")]
     PermissionDenied { path: PathBuf },
     
-    #[error("IO error for {path}: {source}")]
-    IoError { path: PathBuf, source: String },
+    #[error("IO error for {path}: {message}")]
+    IoError { path: PathBuf, message: String },
     
     #[error("Path is outside project boundary: {path}")]
     SecurityViolation { path: PathBuf },
@@ -556,7 +556,7 @@ impl NavigationError {
     pub fn from_io_error(path: PathBuf, source: std::io::Error) -> Self {
         NavigationError::IoError {
             path,
-            source: source.to_string(),
+            message: source.to_string(),
         }
     }
 
@@ -582,5 +582,25 @@ impl NavigationError {
 
     pub fn component_unavailable(component: String, reason: String) -> Self {
         NavigationError::ComponentUnavailable { component, reason }
+    }
+
+    pub fn memory_limit_exceeded(current: u64, limit: u64, component: String) -> Self {
+        NavigationError::MemoryLimitExceeded { current, limit, component }
+    }
+
+    pub fn invalid_path(path: String) -> Self {
+        NavigationError::InvalidPath { path }
+    }
+
+    pub fn file_structure_analysis_failed(file: PathBuf, reason: String) -> Self {
+        NavigationError::FileStructureAnalysisFailed { file, reason }
+    }
+
+    pub fn symbol_analysis_failed(file: PathBuf, reason: String) -> Self {
+        NavigationError::SymbolAnalysisFailed { file, reason }
+    }
+
+    pub fn directory_traversal_error(path: PathBuf) -> Self {
+        NavigationError::DirectoryTraversalError { path }
     }
 }

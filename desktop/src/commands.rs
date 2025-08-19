@@ -17,8 +17,10 @@ use secondary_mind_core::{
         navigation_session_manager::{NavigationSessionManager, NavigationSessionConfig, NavigationSessionMetadata},
         navigation_cache::{NavigationCache, NavigationMetrics},
         symbol_relationship_tracker::{RelationshipAnalysis, SymbolRelationship, RelationshipType},
+        error_recovery_manager::{ErrorRecoveryManager, RecoveryResult},
     },
     model::{project::Project, symbol::{Symbol, FileStructureAnalysis}, session::ProjectSession},
+    errors::{NavigationError, NavigationErrorContext, NavigationErrorSeverity},
     ProjectConfig, RecentProjects, NavigationHistory, 
     NavSessionData as NavigationSessionData, // Use the new navigation session data
 };
@@ -28,6 +30,237 @@ use std::path::PathBuf;
 use tauri::State;
 use tokio::fs;
 use serde::{Serialize, Deserialize};
+use log::{error, warn, info, debug};
+
+/// Structured error response for Tauri commands
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NavigationCommandError {
+    pub error_type: String,
+    pub severity: NavigationErrorSeverity,
+    pub user_message: String,
+    pub technical_details: String,
+    pub suggested_actions: Vec<String>,
+    pub can_continue: bool,
+    pub retry_possible: bool,
+    pub component: String,
+    pub operation: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<NavigationError> for NavigationCommandError {
+    fn from(error: NavigationError) -> Self {
+        Self {
+            error_type: format!("{:?}", std::mem::discriminant(&error)),
+            severity: error.severity(),
+            user_message: error.user_message(),
+            technical_details: format!("{:?}", error),
+            suggested_actions: error.suggested_actions(),
+            can_continue: error.can_continue(),
+            retry_possible: error.supports_retry(),
+            component: "unknown".to_string(),
+            operation: "unknown".to_string(),
+            timestamp: chrono::Utc::now(),
+        }
+    }
+}
+
+impl From<NavigationErrorContext> for NavigationCommandError {
+    fn from(context: NavigationErrorContext) -> Self {
+        Self {
+            error_type: format!("{:?}", std::mem::discriminant(&context.error)),
+            severity: context.severity,
+            user_message: context.user_message,
+            technical_details: context.technical_details,
+            suggested_actions: context.suggested_actions,
+            can_continue: context.can_continue,
+            retry_possible: context.error.supports_retry(),
+            component: context.component,
+            operation: context.operation,
+            timestamp: context.timestamp,
+        }
+    }
+}
+
+impl From<String> for NavigationCommandError {
+    fn from(error: String) -> Self {
+        Self {
+            error_type: "string_error".to_string(),
+            severity: NavigationErrorSeverity::Medium,
+            user_message: error.clone(),
+            technical_details: error,
+            suggested_actions: vec!["Try the operation again".to_string()],
+            can_continue: true,
+            retry_possible: true,
+            component: "unknown".to_string(),
+            operation: "unknown".to_string(),
+            timestamp: chrono::Utc::now(),
+        }
+    }
+}
+
+/// Success response wrapper with optional warnings
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NavigationCommandResponse<T> {
+    pub data: T,
+    pub warnings: Vec<NavigationCommandError>,
+    pub performance_info: Option<PerformanceInfo>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PerformanceInfo {
+    pub execution_time_ms: u64,
+    pub cache_hit: bool,
+    pub memory_usage_mb: Option<f64>,
+}
+
+impl<T> NavigationCommandResponse<T> {
+    pub fn success(data: T) -> Self {
+        Self {
+            data,
+            warnings: Vec::new(),
+            performance_info: None,
+        }
+    }
+
+    pub fn success_with_warnings(data: T, warnings: Vec<NavigationCommandError>) -> Self {
+        Self {
+            data,
+            warnings,
+            performance_info: None,
+        }
+    }
+
+    pub fn with_performance(mut self, performance_info: PerformanceInfo) -> Self {
+        self.performance_info = Some(performance_info);
+        self
+    }
+}
+
+/// Type alias for command results
+pub type CommandResult<T> = Result<NavigationCommandResponse<T>, NavigationCommandError>;
+
+/// Helper function to execute operations with error recovery
+async fn execute_with_recovery<T, F, Fut>(
+    operation: F,
+    component: &str,
+    operation_name: &str,
+    state: &State<'_, AppState>,
+) -> CommandResult<T>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T, NavigationError>>,
+{
+    let recovery_manager = &state.error_recovery_manager;
+    
+    match recovery_manager.execute_with_recovery(operation, component, operation_name).await {
+        RecoveryResult::Success(data) => Ok(NavigationCommandResponse::success(data)),
+        RecoveryResult::Degraded(data, warning_message) => {
+            let warning = NavigationCommandError {
+                error_type: "degraded_functionality".to_string(),
+                severity: NavigationErrorSeverity::Low,
+                user_message: warning_message,
+                technical_details: "Operation completed with limited functionality".to_string(),
+                suggested_actions: vec!["Try refreshing or restarting if full functionality is needed".to_string()],
+                can_continue: true,
+                retry_possible: false,
+                component: component.to_string(),
+                operation: operation_name.to_string(),
+                timestamp: chrono::Utc::now(),
+            };
+            Ok(NavigationCommandResponse::success_with_warnings(data, vec![warning]))
+        }
+        RecoveryResult::Failed(error) => {
+            let mut cmd_error = NavigationCommandError::from(error);
+            cmd_error.component = component.to_string();
+            cmd_error.operation = operation_name.to_string();
+            Err(cmd_error)
+        }
+        RecoveryResult::ManualInterventionRequired(error, instructions) => {
+            let mut cmd_error = NavigationCommandError::from(error);
+            cmd_error.component = component.to_string();
+            cmd_error.operation = operation_name.to_string();
+            cmd_error.suggested_actions = vec![instructions];
+            Err(cmd_error)
+        }
+    }
+}
+
+/// Helper function to execute operations with fallback
+async fn execute_with_fallback<T, F, Fut>(
+    operation: F,
+    fallback: T,
+    component: &str,
+    operation_name: &str,
+    state: &State<'_, AppState>,
+) -> CommandResult<T>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T, NavigationError>>,
+    T: Clone,
+{
+    let recovery_manager = &state.error_recovery_manager;
+    
+    match recovery_manager.execute_with_fallback(operation, fallback, component, operation_name).await {
+        RecoveryResult::Success(data) => Ok(NavigationCommandResponse::success(data)),
+        RecoveryResult::Degraded(data, warning_message) => {
+            let warning = NavigationCommandError {
+                error_type: "fallback_used".to_string(),
+                severity: NavigationErrorSeverity::Low,
+                user_message: warning_message,
+                technical_details: "Using fallback data due to error".to_string(),
+                suggested_actions: vec!["Try refreshing to get updated data".to_string()],
+                can_continue: true,
+                retry_possible: true,
+                component: component.to_string(),
+                operation: operation_name.to_string(),
+                timestamp: chrono::Utc::now(),
+            };
+            Ok(NavigationCommandResponse::success_with_warnings(data, vec![warning]))
+        }
+        RecoveryResult::Failed(error) => {
+            let mut cmd_error = NavigationCommandError::from(error);
+            cmd_error.component = component.to_string();
+            cmd_error.operation = operation_name.to_string();
+            Err(cmd_error)
+        }
+        RecoveryResult::ManualInterventionRequired(error, instructions) => {
+            let mut cmd_error = NavigationCommandError::from(error);
+            cmd_error.component = component.to_string();
+            cmd_error.operation = operation_name.to_string();
+            cmd_error.suggested_actions = vec![instructions];
+            Err(cmd_error)
+        }
+    }
+}
+
+/// Helper function to convert simple string errors to NavigationError
+fn string_to_navigation_error(error: String, component: &str, operation: &str) -> NavigationError {
+    // Try to categorize the error based on common patterns
+    if error.contains("not found") || error.contains("does not exist") {
+        NavigationError::file_not_found(std::path::PathBuf::from("unknown"))
+    } else if error.contains("permission") || error.contains("access denied") {
+        NavigationError::permission_denied(std::path::PathBuf::from("unknown"))
+    } else if error.contains("timeout") {
+        NavigationError::analysis_timeout(5000, operation.to_string())
+    } else if error.contains("memory") {
+        NavigationError::memory_limit_exceeded(100, 50, component.to_string())
+    } else {
+        NavigationError::component_unavailable(component.to_string(), error)
+    }
+}
+
+/// Macro to simplify error conversion in existing commands
+macro_rules! map_error {
+    ($result:expr, $component:expr, $operation:expr) => {
+        $result.map_err(|e| {
+            let nav_error = string_to_navigation_error(e, $component, $operation);
+            let mut cmd_error = NavigationCommandError::from(nav_error);
+            cmd_error.component = $component.to_string();
+            cmd_error.operation = $operation.to_string();
+            cmd_error
+        })
+    };
+}
 
 #[derive(serde::Serialize)]
 pub struct AnalysisResult {
@@ -407,69 +640,87 @@ pub async fn start_file_watching(
 pub async fn analyze_file_structure(
     file_path: String,
     state: State<'_, AppState>,
-) -> Result<FileStructureAnalysis, String> {
-    let path = PathBuf::from(&file_path);
+) -> CommandResult<FileStructureAnalysis> {
+    let start_time = std::time::Instant::now();
     
-    // Validate file path exists and is within project bounds
-    if !path.exists() {
-        return Err(format!("File not found: {}", file_path));
-    }
-    
-    if !path.is_file() {
-        return Err(format!("Path is not a file: {}", file_path));
-    }
-    
-    // Check if we have a current project loaded for security validation
-    let project_root = {
-        let project_guard = state.current_project.lock().unwrap();
-        if let Some(project) = project_guard.as_ref() {
-            project.root.clone()
-        } else {
-            // If no project is loaded, allow analysis but be more restrictive
-            path.parent().unwrap_or(&path).to_path_buf()
-        }
-    };
-    
-    // Security check: ensure file is within project bounds
-    let canonical_path = path.canonicalize().map_err(|e| {
-        format!("Failed to resolve file path: {}", e)
-    })?;
-    
-    let canonical_root = project_root.canonicalize().map_err(|e| {
-        format!("Failed to resolve project root: {}", e)
-    })?;
-    
-    if !canonical_path.starts_with(&canonical_root) {
-        return Err("File path is outside project boundary".to_string());
-    }
-    
-    // Create cartographer and perform analysis
-    let cartographer = CodebaseCartographer::new();
-    
-    // Try to use cached result first from NavigationCache
-    {
-        let mut nav_cache = state.navigation_cache.lock().unwrap();
-        if let Some(cached_analysis) = nav_cache.get_file_structure(&canonical_path) {
-            log::debug!("Cache hit for file structure: {}", canonical_path.display());
-            return Ok(cached_analysis);
-        }
-    }
-    
-    // Perform fresh analysis
-    let structure_analysis = cartographer.analyze_file_structure(&canonical_path)
-        .map_err(|e| e.to_string())?;
-    
-    // Cache the result in NavigationCache
-    {
-        let mut nav_cache = state.navigation_cache.lock().unwrap();
-        if let Err(e) = nav_cache.cache_file_structure(&canonical_path, structure_analysis.clone()) {
-            log::warn!("Failed to cache file structure analysis: {}", e);
-        } else {
-            log::debug!("Cached file structure analysis for: {}", canonical_path.display());
-        }
-    }
-    
-    Ok(structure_analysis)
+    execute_with_recovery(
+        || async {
+            let path = PathBuf::from(&file_path);
+            
+            // Validate file path exists and is within project bounds
+            if !path.exists() {
+                return Err(NavigationError::file_not_found(path));
+            }
+            
+            if !path.is_file() {
+                return Err(NavigationError::invalid_path(file_path.clone()));
+            }
+            
+            // Check if we have a current project loaded for security validation
+            let project_root = {
+                let project_guard = state.current_project.lock().unwrap();
+                if let Some(project) = project_guard.as_ref() {
+                    project.root.clone()
+                } else {
+                    // If no project is loaded, allow analysis but be more restrictive
+                    path.parent().unwrap_or(&path).to_path_buf()
+                }
+            };
+            
+            // Security check: ensure file is within project bounds
+            let canonical_path = path.canonicalize().map_err(|e| {
+                NavigationError::from_io_error(path.clone(), e)
+            })?;
+            
+            let canonical_root = project_root.canonicalize().map_err(|e| {
+                NavigationError::from_io_error(project_root.clone(), e)
+            })?;
+            
+            if !canonical_path.starts_with(&canonical_root) {
+                return Err(NavigationError::security_violation(canonical_path));
+            }
+            
+            // Create cartographer and perform analysis
+            let cartographer = CodebaseCartographer::new();
+            
+            // Try to use cached result first from NavigationCache
+            {
+                let mut nav_cache = state.navigation_cache.lock().unwrap();
+                if let Some(cached_analysis) = nav_cache.get_file_structure(&canonical_path) {
+                    debug!("Cache hit for file structure: {}", canonical_path.display());
+                    return Ok(cached_analysis);
+                }
+            }
+            
+            // Perform fresh analysis
+            let structure_analysis = cartographer.analyze_file_structure(&canonical_path)
+                .map_err(|e| NavigationError::file_structure_analysis_failed(canonical_path.clone(), e.to_string()))?;
+            
+            // Cache the result in NavigationCache
+            {
+                let mut nav_cache = state.navigation_cache.lock().unwrap();
+                if let Err(e) = nav_cache.cache_file_structure(&canonical_path, structure_analysis.clone()) {
+                    warn!("Failed to cache file structure analysis: {}", e);
+                } else {
+                    debug!("Cached file structure analysis for: {}", canonical_path.display());
+                }
+            }
+            
+            Ok(structure_analysis)
+        },
+        "file_analysis",
+        "analyze_file_structure",
+        &state,
+    ).await.map(|mut response| {
+        // Add performance information
+        let execution_time = start_time.elapsed().as_millis() as u64;
+        let performance_info = PerformanceInfo {
+            execution_time_ms: execution_time,
+            cache_hit: false, // Would be set to true if cache was hit
+            memory_usage_mb: None, // Could be calculated if needed
+        };
+        response.with_performance(performance_info)
+    })
 }
 
 // Navigation Backend Integration Commands - Symbol Relationship Analysis
@@ -477,7 +728,7 @@ pub async fn analyze_file_structure(
 
 // Enhanced File Tree Data Structures
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct FileTreeOptions {
     pub include_hidden: Option<bool>,
     pub include_git_ignored: Option<bool>,
@@ -538,75 +789,101 @@ pub async fn analyze_symbol_relationships(
     symbol_id: String,
     depth: Option<usize>,
     state: State<'_, AppState>,
-) -> Result<RelationshipAnalysis, String> {
-    use secondary_mind_core::components::symbol_relationship_tracker::SymbolRelationshipTracker;
+) -> CommandResult<RelationshipAnalysis> {
+    let start_time = std::time::Instant::now();
     
-    // Check cache first
-    let analysis_depth = depth.unwrap_or(2);
-    {
-        let mut nav_cache = state.navigation_cache.lock().unwrap();
-        if let Some(cached_analysis) = nav_cache.get_symbol_relationships(&symbol_id, analysis_depth) {
-            log::debug!("Cache hit for symbol relationships: {}", symbol_id);
-            return Ok(cached_analysis);
-        }
-    }
-    
-    // Get current project for context
-    let project_root = {
-        let project_guard = state.current_project.lock().unwrap();
-        if let Some(project) = project_guard.as_ref() {
-            project.root.clone()
-        } else {
-            return Err("No project currently loaded".to_string());
-        }
-    };
-    
-    // Create and populate relationship tracker
-    let mut relationship_tracker = SymbolRelationshipTracker::new();
-    
-    // Scan project and build relationship graph
-    let cartographer = CodebaseCartographer::new();
-    let symbols = scan_project_for_symbols(&project_root, &cartographer);
-    
-    // Add all symbols to the tracker
-    for symbol in &symbols {
-        relationship_tracker.add_symbol_definition(symbol.clone())
-            .map_err(|e| format!("Failed to add symbol definition: {}", e))?;
-    }
-    
-    // Build relationships by analyzing symbol usage across files
-    build_symbol_relationships(&project_root, &symbols, &mut relationship_tracker)
-        .map_err(|e| format!("Failed to build relationships: {}", e))?;
-    
-    // Find the center symbol
-    let center_symbol = symbols.iter()
-        .find(|s| relationship_tracker.generate_symbol_id(s) == symbol_id)
-        .ok_or_else(|| format!("Symbol not found: {}", symbol_id))?
-        .clone();
-    
-    // Analyze relationships with specified depth
-    let relationships = analyze_symbol_relationships_with_depth(
-        &relationship_tracker,
-        &symbol_id,
-        analysis_depth,
-        &symbols
-    )?;
-    
-    let result = RelationshipAnalysis {
-        center_symbol,
-        total_connections: relationships.len(),
-        relationships,
-        analysis_depth,
-    };
-    
-    // Cache the result
-    {
-        let mut nav_cache = state.navigation_cache.lock().unwrap();
-        nav_cache.cache_symbol_relationships(&symbol_id, analysis_depth, result.clone());
-        log::debug!("Cached symbol relationships for: {}", symbol_id);
-    }
-    
-    Ok(result)
+    execute_with_recovery(
+        || async {
+            use secondary_mind_core::components::symbol_relationship_tracker::SymbolRelationshipTracker;
+            
+            // Check cache first
+            let analysis_depth = depth.unwrap_or(2);
+            {
+                let mut nav_cache = state.navigation_cache.lock().unwrap();
+                if let Some(cached_analysis) = nav_cache.get_symbol_relationships(&symbol_id, analysis_depth) {
+                    debug!("Cache hit for symbol relationships: {}", symbol_id);
+                    return Ok(cached_analysis);
+                }
+            }
+            
+            // Get current project for context
+            let project_root = {
+                let project_guard = state.current_project.lock().unwrap();
+                if let Some(project) = project_guard.as_ref() {
+                    project.root.clone()
+                } else {
+                    return Err(NavigationError::no_project_loaded());
+                }
+            };
+            
+            // Create and populate relationship tracker
+            let mut relationship_tracker = SymbolRelationshipTracker::new();
+            
+            // Scan project and build relationship graph
+            let cartographer = CodebaseCartographer::new();
+            let symbols = scan_project_for_symbols(&project_root, &cartographer);
+            
+            // Add all symbols to the tracker
+            for symbol in &symbols {
+                relationship_tracker.add_symbol_definition(symbol.clone())
+                    .map_err(|e| NavigationError::symbol_analysis_failed(
+                        symbol.location.path.clone(), 
+                        format!("Failed to add symbol definition: {}", e)
+                    ))?;
+            }
+            
+            // Build relationships by analyzing symbol usage across files
+            build_symbol_relationships(&project_root, &symbols, &mut relationship_tracker)
+                .map_err(|e| NavigationError::symbol_analysis_failed(
+                    project_root.clone(), 
+                    format!("Failed to build relationships: {}", e)
+                ))?;
+            
+            // Find the center symbol
+            let center_symbol = symbols.iter()
+                .find(|s| relationship_tracker.generate_symbol_id(s) == symbol_id)
+                .ok_or_else(|| NavigationError::symbol_not_found(symbol_id.clone()))?
+                .clone();
+            
+            // Analyze relationships with specified depth
+            let relationships = analyze_symbol_relationships_with_depth(
+                &relationship_tracker,
+                &symbol_id,
+                analysis_depth,
+                &symbols
+            ).map_err(|e| NavigationError::symbol_analysis_failed(
+                project_root.clone(),
+                format!("Failed to analyze relationships: {}", e)
+            ))?;
+            
+            let result = RelationshipAnalysis {
+                center_symbol,
+                total_connections: relationships.len(),
+                relationships,
+                analysis_depth,
+            };
+            
+            // Cache the result
+            {
+                let mut nav_cache = state.navigation_cache.lock().unwrap();
+                nav_cache.cache_symbol_relationships(&symbol_id, analysis_depth, result.clone());
+                debug!("Cached symbol relationships for: {}", symbol_id);
+            }
+            
+            Ok(result)
+        },
+        "symbol_analysis",
+        "analyze_symbol_relationships",
+        &state,
+    ).await.map(|mut response| {
+        let execution_time = start_time.elapsed().as_millis() as u64;
+        let performance_info = PerformanceInfo {
+            execution_time_ms: execution_time,
+            cache_hit: false,
+            memory_usage_mb: None,
+        };
+        response.with_performance(performance_info)
+    })
 }
 
 // Helper function to build symbol relationships across the project
@@ -862,17 +1139,19 @@ pub async fn get_enhanced_file_tree(
     directory_path: String,
     options: Option<FileTreeOptions>,
     state: State<'_, AppState>,
-) -> Result<EnhancedFileTree, String> {
+) -> CommandResult<EnhancedFileTree> {
     let start_time = std::time::Instant::now();
+    
+    let options = options.unwrap_or_default();
     let path = PathBuf::from(&directory_path);
     
     // Validate directory path exists
     if !path.exists() {
-        return Err(format!("Directory not found: {}", directory_path));
+        return Err(NavigationCommandError::from(NavigationError::file_not_found(path)));
     }
     
     if !path.is_dir() {
-        return Err(format!("Path is not a directory: {}", directory_path));
+        return Err(NavigationCommandError::from(NavigationError::invalid_path(directory_path.clone())));
     }
     
     // Security check: ensure directory is within project bounds if project is loaded
@@ -887,23 +1166,23 @@ pub async fn get_enhanced_file_tree(
     
     if let Some(root) = &project_root {
         let canonical_path = path.canonicalize().map_err(|e| {
-            format!("Failed to resolve directory path: {}", e)
+            NavigationCommandError::from(NavigationError::from_io_error(path.clone(), e))
         })?;
         
         let canonical_root = root.canonicalize().map_err(|e| {
-            format!("Failed to resolve project root: {}", e)
+            NavigationCommandError::from(NavigationError::from_io_error(root.clone(), e))
         })?;
         
         if !canonical_path.starts_with(&canonical_root) {
-            return Err("Directory path is outside project boundary".to_string());
+            return Err(NavigationCommandError::from(NavigationError::security_violation(canonical_path)));
         }
     }
     
-    let options = options.unwrap_or_default();
-    
     // Initialize components
     let cartographer = CodebaseCartographer::new();
-    let mut cache_manager = CacheManager::new().map_err(|e| e.to_string())?;
+    let mut cache_manager = CacheManager::new().map_err(|e| {
+        NavigationCommandError::from(NavigationError::component_unavailable("cache_manager".to_string(), e.to_string()))
+    })?;
     
     // Initialize git controller if we're in a git repository
     let git_controller = if let Some(root) = &project_root {
@@ -928,16 +1207,26 @@ pub async fn get_enhanced_file_tree(
         &mut total_files,
         &mut total_directories,
         0,
-    )?;
+    ).map_err(|_e| NavigationCommandError::from(NavigationError::directory_traversal_error(path.clone())))?;
     
     let analysis_time = format!("{:.2}ms", start_time.elapsed().as_millis());
     
-    Ok(EnhancedFileTree {
+    let result = EnhancedFileTree {
         nodes,
         total_files,
         total_directories,
         analysis_time,
-    })
+    };
+    
+    let execution_time = start_time.elapsed().as_millis() as u64;
+    let performance_info = PerformanceInfo {
+        execution_time_ms: execution_time,
+        cache_hit: false,
+        memory_usage_mb: None,
+    };
+    
+    let response = NavigationCommandResponse::success(result).with_performance(performance_info);
+    Ok(response)
 }
 
 // Helper function to build file tree nodes recursively
@@ -2493,4 +2782,71 @@ pub async fn get_git_repository_root(
     log::debug!("Git repository root for {}: {:?}", file_path, result);
     
     Ok(result)
+}
+
+// Error handling and recovery commands
+
+#[tauri::command]
+pub async fn get_error_recovery_stats(
+    state: State<'_, AppState>,
+) -> CommandResult<secondary_mind_core::components::error_recovery_manager::ErrorRecoveryStats> {
+    let stats = state.error_recovery_manager.get_stats();
+    Ok(NavigationCommandResponse::success(stats))
+}
+
+#[tauri::command]
+pub async fn get_error_patterns(
+    state: State<'_, AppState>,
+) -> CommandResult<std::collections::HashMap<String, secondary_mind_core::components::error_recovery_manager::ErrorPattern>> {
+    let patterns = state.error_recovery_manager.get_error_patterns();
+    Ok(NavigationCommandResponse::success(patterns))
+}
+
+#[tauri::command]
+pub async fn reset_error_stats(
+    state: State<'_, AppState>,
+) -> CommandResult<()> {
+    state.error_recovery_manager.reset_stats();
+    info!("Error recovery statistics have been reset");
+    Ok(NavigationCommandResponse::success(()))
+}
+
+#[tauri::command]
+pub async fn test_error_recovery(
+    error_type: String,
+    state: State<'_, AppState>,
+) -> CommandResult<String> {
+    // Test command to simulate different error types for testing recovery mechanisms
+    execute_with_recovery(
+        || async {
+            match error_type.as_str() {
+                "file_not_found" => Err(NavigationError::file_not_found(PathBuf::from("test.txt"))),
+                "permission_denied" => Err(NavigationError::permission_denied(PathBuf::from("test.txt"))),
+                "timeout" => Err(NavigationError::analysis_timeout(5000, "test_operation".to_string())),
+                "memory_limit" => Err(NavigationError::memory_limit_exceeded(100, 50, "test_component".to_string())),
+                "success" => Ok("Test operation completed successfully".to_string()),
+                _ => Err(NavigationError::component_unavailable("test_component".to_string(), "Unknown error type".to_string())),
+            }
+        },
+        "error_recovery_test",
+        "test_error_recovery",
+        &state,
+    ).await
+}
+
+/// Configure error logging levels and behavior
+#[tauri::command]
+pub async fn configure_error_logging(
+    log_level: String,
+    enable_detailed_logging: bool,
+    state: State<'_, AppState>,
+) -> CommandResult<()> {
+    // This would configure the logging system
+    // For now, just log the configuration change
+    info!("Error logging configured: level={}, detailed={}", log_level, enable_detailed_logging);
+    
+    // In a real implementation, this would update the logging configuration
+    // and possibly the error recovery manager settings
+    
+    Ok(NavigationCommandResponse::success(()))
 }

@@ -43,6 +43,11 @@ rand = "0.8"
 tokio-util = "0.7"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
+# Dependencies for serialization and compression
+flate2 = "1.0"
+rmp-serde = "1.1"
+md5 = "0.7"
+
 # Platform-specific dependencies for file locking
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

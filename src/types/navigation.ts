@@ -263,7 +263,7 @@ export interface FileTreeNode {
   type: 'file' | 'directory';
   isExpanded: boolean;
   isSelected: boolean;
-  children: FileTreeNode[];
+  children?: FileTreeNode[];
   metadata: FileNodeMetadata;
   preview?: FilePreview;
 }
@@ -289,7 +289,7 @@ export interface FilePreview {
   dependencies: string[];
 }
 
-export type GitFileStatus = 
+export type GitFileStatusType = 
   | 'untracked'
   | 'modified'
   | 'added'
@@ -1127,6 +1127,10 @@ export type OptionalFields<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, 
 // Error Types
 // ============================================================================
 
+// ============================================================================
+// Enhanced Error Handling Types (matching backend NavigationError)
+// ============================================================================
+
 export interface NavigationError {
   code: string;
   message: string;
@@ -1134,16 +1138,299 @@ export interface NavigationError {
   timestamp: Date;
   source: string;
   recoverable: boolean;
+  severity: NavigationErrorSeverity;
+  recovery_strategy: NavigationRecoveryStrategy;
+  user_message: string;
+  technical_details: string;
+  suggested_actions: string[];
+  can_continue: boolean;
+}
+
+export type NavigationErrorSeverity = 
+  | 'Low'
+  | 'Medium' 
+  | 'High'
+  | 'Critical';
+
+export interface NavigationRecoveryStrategy {
+  type: 'Retry' | 'Fallback' | 'Degrade' | 'Reset' | 'Skip' | 'Manual' | 'None';
+  max_attempts?: number;
+  backoff_ms?: number;
+  fallback_type?: string;
+  limited_functionality?: string;
+  preserve_cache?: boolean;
+  continue_operation?: boolean;
+  instructions?: string;
 }
 
 export type NavigationErrorType = 
-  | 'SYMBOL_NOT_FOUND'
-  | 'FILE_NOT_ACCESSIBLE'
-  | 'ANALYSIS_FAILED'
-  | 'CACHE_ERROR'
-  | 'PERFORMANCE_DEGRADATION'
-  | 'MEMORY_LIMIT_EXCEEDED'
-  | 'NETWORK_ERROR'
+  // File System Errors
+  | 'FILE_NOT_FOUND'
   | 'PERMISSION_DENIED'
-  | 'INVALID_CONFIGURATION'
+  | 'IO_ERROR'
+  | 'SECURITY_VIOLATION'
+  | 'INVALID_PATH'
+  | 'DIRECTORY_TRAVERSAL_ERROR'
+  
+  // Analysis Errors
+  | 'SYMBOL_ANALYSIS_FAILED'
+  | 'FILE_STRUCTURE_ANALYSIS_FAILED'
+  | 'RELATIONSHIP_ANALYSIS_TIMEOUT'
+  | 'UNSUPPORTED_FILE_TYPE'
+  | 'AST_PARSING_FAILED'
+  | 'SYMBOL_NOT_FOUND'
+  | 'CIRCULAR_DEPENDENCY'
+  
+  // Session Management Errors
+  | 'SESSION_NOT_FOUND'
+  | 'SESSION_DATA_CORRUPTED'
+  | 'CONCURRENT_ACCESS_CONFLICT'
+  | 'SESSION_SERIALIZATION_FAILED'
+  | 'SESSION_VALIDATION_FAILED'
+  | 'SESSION_STORAGE_FULL'
+  
+  // Navigation History Errors
+  | 'NAVIGATION_HISTORY_CORRUPTED'
+  | 'HISTORY_ENTRY_NOT_FOUND'
+  | 'HISTORY_CLEANUP_FAILED'
+  
+  // Cache Errors
+  | 'CACHE_OPERATION_FAILED'
+  | 'CACHE_CORRUPTION'
+  | 'CACHE_MEMORY_LIMIT_EXCEEDED'
+  | 'CACHE_INVALIDATION_FAILED'
+  
+  // Git Integration Errors
+  | 'GIT_REPOSITORY_NOT_FOUND'
+  | 'GIT_OPERATION_FAILED'
+  | 'GIT_STATUS_UNAVAILABLE'
+  
+  // Performance and Resource Errors
+  | 'ANALYSIS_TIMEOUT'
+  | 'MEMORY_LIMIT_EXCEEDED'
+  | 'RESOURCE_EXHAUSTION'
+  | 'BACKGROUND_TASK_FAILED'
+  
+  // Project Context Errors
+  | 'NO_PROJECT_LOADED'
+  | 'PROJECT_INITIALIZATION_FAILED'
+  | 'PROJECT_CONFIGURATION_INVALID'
+  
+  // Data Validation Errors
+  | 'INVALID_NAVIGATION_DATA'
+  | 'DATA_MIGRATION_FAILED'
+  | 'SCHEMA_VALIDATION_FAILED'
+  
+  // Component Integration Errors
+  | 'COMPONENT_UNAVAILABLE'
+  | 'COMPONENT_INITIALIZATION_FAILED'
+  | 'SERVICE_COMMUNICATION_FAILED'
+  
+  // Recovery and Degradation
+  | 'COMPONENT_DEGRADED'
+  | 'RECOVERY_FAILED'
+  | 'GRACEFUL_DEGRADATION'
+  
+  // Legacy/Generic
   | 'UNKNOWN_ERROR';
+
+// ============================================================================
+// Backend Response Types (matching Rust backend implementations)
+// ============================================================================
+
+export interface FileStructureAnalysis {
+  outline: StructureNode[];
+  symbol_density: SymbolDensityMap;
+  file_metadata: FileMetadata;
+}
+
+export interface StructureNode {
+  name: string;
+  node_type: string;
+  start_line: number;
+  end_line: number;
+  children: StructureNode[];
+  symbol?: Symbol;
+}
+
+export interface SymbolDensityMap {
+  regions: DensityRegion[];
+  max_density: number;
+  total_symbols: number;
+  last_updated: string;
+}
+
+export interface DensityRegion {
+  start_line: number;
+  end_line: number;
+  density: number;
+  symbol_types: Record<string, number>;
+}
+
+export interface FileMetadata {
+  file_size: number;
+  last_modified: string;
+  symbol_count: number;
+  main_symbols: Symbol[];
+}
+
+export interface RelationshipAnalysis {
+  center_symbol: Symbol;
+  relationships: SymbolRelationship[];
+  analysis_depth: number;
+  total_connections: number;
+}
+
+export interface SymbolRelationship {
+  relationship_type: RelationshipType;
+  source: Symbol;
+  target: Symbol;
+  strength: number;
+  locations: CodeLocation[];
+}
+
+export interface EnhancedFileTree {
+  nodes: FileTreeNode[];
+  total_files: number;
+  total_directories: number;
+  analysis_time: string;
+}
+
+export interface FileTreeNode {
+  id: string;
+  name: string;
+  path: string;
+  node_type: FileNodeType;
+  children?: FileTreeNode[];
+  metadata: FileNodeMetadata;
+}
+
+export type FileNodeType = 'file' | 'directory';
+
+export interface FileNodeMetadata {
+  symbol_count: number;
+  file_size: number;
+  last_modified: string;
+  git_status?: GitFileStatus;
+  main_symbols: Symbol[];
+}
+
+export interface GitFileStatus {
+  status: string;
+  branch: string;
+  last_commit?: string;
+}
+
+export interface NavigationHistoryData {
+  entries: NavigationHistoryEntry[];
+  sessions: NavigationSession[];
+  current_index: number;
+  max_entries: number;
+}
+
+export interface NavigationSessionData {
+  id: string;
+  name: string;
+  layout_configuration: LayoutConfiguration;
+  navigation_state: NavigationState;
+  created_at: string;
+  last_accessed: string;
+}
+
+export interface NavigationState {
+  current_location?: NavigationLocation;
+  history: NavigationHistoryEntry[];
+  bookmarks: NavigationLocation[];
+  recent_symbols: Symbol[];
+}
+
+export interface SymbolUsageAnalysis {
+  symbol: Symbol;
+  reference_count: number;
+  call_count: number;
+  last_used: string;
+  usage_frequency: number;
+  hotspots: UsageHotspot[];
+}
+
+export interface UsageHotspot {
+  file_path: string;
+  position: Position;
+  usage_type: UsageType;
+  frequency: number;
+}
+
+export type UsageType = 'call' | 'reference' | 'definition' | 'import';
+
+export interface CallHierarchyAnalysis {
+  function: Symbol;
+  callers: FunctionReference[];
+  callees: FunctionReference[];
+  depth_analyzed: number;
+}
+
+export interface FunctionReference {
+  identifier: string;
+  kind: string;
+  location: CodeLocation;
+  call_count: number;
+}
+
+export interface InheritanceHierarchyAnalysis {
+  class: Symbol;
+  parents: ClassReference[];
+  children: ClassReference[];
+  depth: number;
+  breadth: number;
+}
+
+export interface ClassReference {
+  identifier: string;
+  kind: string;
+  relationship: string;
+  location: CodeLocation;
+}
+
+export interface ClassMember {
+  identifier: string;
+  kind: string;
+  accessibility: string;
+  is_static: boolean;
+  parameters?: string[];
+  return_type?: string;
+  type?: string;
+}
+
+export interface Implementation {
+  identifier: string;
+  kind: string;
+  location: CodeLocation;
+  implements_interface: string;
+}
+
+export interface NavigationMetrics {
+  navigation_response_time: number;
+  memory_usage: number;
+  cache_hit_rate: number;
+  background_processing_time: number;
+  active_sessions: number;
+}
+
+// ============================================================================
+// Enhanced Error Context Types
+// ============================================================================
+
+export interface NavigationErrorContext {
+  error: NavigationError;
+  severity: NavigationErrorSeverity;
+  recovery_strategy: NavigationRecoveryStrategy;
+  timestamp: string;
+  component: string;
+  operation: string;
+  user_message: string;
+  technical_details: string;
+  suggested_actions: string[];
+  related_errors: string[];
+  retry_count: number;
+  can_continue: boolean;
+}

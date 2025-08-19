@@ -3,6 +3,25 @@
 // Architecture: [This file defines the contract between the frontend and the Tauri backend. The `Symbol` interface is updated to include Rust-specific kinds, aligning with the core Rust model.]
 // Dependencies: [@tauri-apps/api/tauri for backend invocation.]
 import { invoke } from '@tauri-apps/api/tauri';
+import { 
+  FileStructureAnalysis, 
+  RelationshipAnalysis, 
+  EnhancedFileTree, 
+  NavigationHistoryData,
+  NavigationSessionData,
+  SymbolUsageAnalysis,
+  CallHierarchyAnalysis,
+  FunctionReference,
+  InheritanceHierarchyAnalysis,
+  ClassMember,
+  Implementation,
+  NavigationMetrics,
+  GitFileStatus,
+  NavigationError,
+  NavigationErrorType,
+  NavigationErrorSeverity,
+  NavigationRecoveryStrategy
+} from './types/navigation';
 
 // Enhanced type definitions to include Rust symbols
 export interface Symbol {
@@ -128,6 +147,37 @@ const isTauri = () => {
   }
 };
 
+// Check if we're in development mode
+const isDevelopmentMode = () => {
+  return !isTauri() || process.env.NODE_ENV === 'development';
+};
+
+// Development mode fallback utility
+const withDevelopmentFallback = async <T>(
+  tauriOperation: () => Promise<T>,
+  mockData: T,
+  operationName: string,
+  delay: number = 300
+): Promise<T> => {
+  if (isTauri()) {
+    try {
+      return await tauriOperation();
+    } catch (error) {
+      if (isDevelopmentMode()) {
+        console.warn(`🔧 Development mode: ${operationName} failed, using mock data:`, error);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return mockData;
+      } else {
+        throw handleNavigationError(error, operationName);
+      }
+    }
+  } else {
+    console.log(`🔧 Development mode: Using mock ${operationName}`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return mockData;
+  }
+};
+
 // Mock data for development mode (enhanced with project configs)
 const MOCK_RECENT_PROJECTS: RecentProjects = {
   projects: [
@@ -180,6 +230,52 @@ const MOCK_PROJECT_NOTES: ProjectNote[] = [
     is_favorited: true,
   },
 ];
+
+// Error handling utility
+const handleNavigationError = (error: any, operation: string): NavigationError => {
+  // If it's already a structured NavigationError from backend
+  if (error && typeof error === 'object' && error.error) {
+    return {
+      code: error.error,
+      message: error.user_message || error.message || 'Navigation operation failed',
+      details: error.technical_details,
+      timestamp: new Date(error.timestamp || Date.now()),
+      source: error.component || 'frontend',
+      recoverable: error.can_continue || false,
+      severity: error.severity || 'Medium',
+      recovery_strategy: error.recovery_strategy || { type: 'None' },
+      user_message: error.user_message || error.message || 'Navigation operation failed',
+      technical_details: error.technical_details || String(error),
+      suggested_actions: error.suggested_actions || ['Try again later'],
+      can_continue: error.can_continue || false
+    };
+  }
+  
+  // Handle string errors or unknown errors
+  const errorMessage = typeof error === 'string' ? error : error?.message || 'Unknown error';
+  
+  // Map common error patterns to NavigationErrorType
+  let errorType: NavigationErrorType = 'UNKNOWN_ERROR';
+  if (errorMessage.includes('not found')) errorType = 'FILE_NOT_FOUND';
+  else if (errorMessage.includes('permission')) errorType = 'PERMISSION_DENIED';
+  else if (errorMessage.includes('timeout')) errorType = 'ANALYSIS_TIMEOUT';
+  else if (errorMessage.includes('memory')) errorType = 'MEMORY_LIMIT_EXCEEDED';
+  
+  return {
+    code: errorType,
+    message: errorMessage,
+    details: error,
+    timestamp: new Date(),
+    source: 'frontend',
+    recoverable: true,
+    severity: 'Medium' as NavigationErrorSeverity,
+    recovery_strategy: { type: 'Retry', max_attempts: 3, backoff_ms: 1000 },
+    user_message: `Failed to ${operation}: ${errorMessage}`,
+    technical_details: String(error),
+    suggested_actions: ['Try again', 'Check your connection', 'Restart the application'],
+    can_continue: true
+  };
+};
 
 // Enhanced API functions
 export const api = {
@@ -427,83 +523,98 @@ export const api = {
   // ============================================================================
 
   // Symbol relationship analysis
-  async analyzeSymbolRelationships(symbolId: string, depth: number = 2): Promise<any> {
+  async analyzeSymbolRelationships(symbolId: string, depth: number = 2): Promise<RelationshipAnalysis> {
     if (isTauri()) {
       try {
-        return await invoke('analyze_symbol_relationships', { symbolId, depth });
+        return await invoke<RelationshipAnalysis>('analyze_symbol_relationships', { symbolId, depth });
       } catch (error) {
         console.error('Failed to analyze symbol relationships:', error);
-        throw error;
+        throw handleNavigationError(error, 'analyzeSymbolRelationships');
       }
     } else {
       console.log('🔧 Development mode: Using mock symbol relationships');
       await new Promise(resolve => setTimeout(resolve, 800));
       return {
-        centerSymbol: { identifier: symbolId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
+        center_symbol: { identifier: symbolId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
         relationships: [
-          { type: 'calls', target: { identifier: 'helperFunction', kind: 'TSFunction' }, strength: 0.8 },
-          { type: 'references', target: { identifier: 'UserInterface', kind: 'TSInterface' }, strength: 0.6 }
-        ]
+          { 
+            relationship_type: 'calls', 
+            source: { identifier: symbolId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
+            target: { identifier: 'helperFunction', kind: 'TSFunction', location: { path: '/src/helper.ts', line: 5, column: 1 } }, 
+            strength: 0.8,
+            locations: []
+          },
+          { 
+            relationship_type: 'references', 
+            source: { identifier: symbolId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
+            target: { identifier: 'UserInterface', kind: 'TSInterface', location: { path: '/src/types.ts', line: 15, column: 1 } }, 
+            strength: 0.6,
+            locations: []
+          }
+        ],
+        analysis_depth: depth,
+        total_connections: 2
       };
     }
   },
 
   // File structure analysis for minimap
-  async analyzeFileStructure(filePath: string): Promise<any> {
+  async analyzeFileStructure(filePath: string): Promise<FileStructureAnalysis> {
     if (isTauri()) {
       try {
-        return await invoke('analyze_file_structure', { filePath });
+        return await invoke<FileStructureAnalysis>('analyze_file_structure', { filePath });
       } catch (error) {
-        console.warn('Tauri command not found, falling back to mock data:', error);
-        // Fall back to mock data when command doesn't exist
-        await new Promise(resolve => setTimeout(resolve, 400));
-        return {
-          outline: [
-            { name: 'imports', type: 'section', startLine: 1, endLine: 5, children: [] },
-            { name: 'UserService', type: 'class', startLine: 7, endLine: 45, children: [
-              { name: 'constructor', type: 'method', startLine: 8, endLine: 12, children: [] },
-              { name: 'authenticate', type: 'method', startLine: 14, endLine: 25, children: [] }
-            ]}
-          ],
-          symbolDensity: { regions: [{ startLine: 1, endLine: 50, density: 0.3, symbolTypes: new Map([['class', 1], ['method', 2]]) }] }
-        };
+        console.error('Failed to analyze file structure:', error);
+        throw this.handleNavigationError(error, 'analyzeFileStructure');
       }
     } else {
       console.log('🔧 Development mode: Using mock file structure');
       await new Promise(resolve => setTimeout(resolve, 400));
       return {
         outline: [
-          { name: 'imports', type: 'section', startLine: 1, endLine: 5, children: [] },
-          { name: 'UserService', type: 'class', startLine: 7, endLine: 45, children: [
-            { name: 'constructor', type: 'method', startLine: 8, endLine: 12, children: [] },
-            { name: 'authenticate', type: 'method', startLine: 14, endLine: 25, children: [] }
+          { name: 'imports', node_type: 'section', start_line: 1, end_line: 5, children: [] },
+          { name: 'UserService', node_type: 'class', start_line: 7, end_line: 45, children: [
+            { name: 'constructor', node_type: 'method', start_line: 8, end_line: 12, children: [] },
+            { name: 'authenticate', node_type: 'method', start_line: 14, end_line: 25, children: [] }
           ]}
         ],
-        symbolDensity: { regions: [{ startLine: 1, endLine: 50, density: 0.3, symbolTypes: new Map([['class', 1], ['method', 2]]) }] }
+        symbol_density: { 
+          regions: [{ start_line: 1, end_line: 50, density: 0.3, symbol_types: { 'class': 1, 'method': 2 } }],
+          max_density: 0.3,
+          total_symbols: 3,
+          last_updated: new Date().toISOString()
+        },
+        file_metadata: {
+          file_size: 1024,
+          last_modified: new Date().toISOString(),
+          symbol_count: 3,
+          main_symbols: []
+        }
       };
     }
   },
 
   // Navigation history management
-  async saveNavigationHistory(projectPath: string, history: any): Promise<void> {
+  async saveNavigationHistory(projectPath: string, history: NavigationHistoryData): Promise<void> {
     if (isTauri()) {
       try {
         await invoke('save_navigation_history', { projectPath, history });
       } catch (error) {
         console.error('Failed to save navigation history:', error);
-        throw error;
+        throw handleNavigationError(error, 'saveNavigationHistory');
       }
     } else {
       console.log('🔧 Development mode: Navigation history save simulated');
     }
   },
 
-  async loadNavigationHistory(projectPath: string): Promise<any> {
+  async loadNavigationHistory(projectPath: string): Promise<NavigationHistoryData | null> {
     if (isTauri()) {
       try {
-        return await invoke('load_navigation_history', { projectPath });
+        return await invoke<NavigationHistoryData | null>('load_navigation_history', { projectPath });
       } catch (error) {
         console.error('Failed to load navigation history:', error);
+        // For history loading, we can gracefully degrade to null
         return null;
       }
     } else {
@@ -512,19 +623,20 @@ export const api = {
       return {
         entries: [],
         sessions: [],
-        currentIndex: -1
+        current_index: -1,
+        max_entries: 100
       };
     }
   },
 
   // File tree with enhanced metadata
-  async getEnhancedFileTree(directoryPath: string, options?: any): Promise<any> {
+  async getEnhancedFileTree(directoryPath: string, options?: any): Promise<EnhancedFileTree> {
     if (isTauri()) {
       try {
-        return await invoke('get_enhanced_file_tree', { directoryPath, options });
+        return await invoke<EnhancedFileTree>('get_enhanced_file_tree', { directoryPath, options });
       } catch (error) {
         console.error('Failed to get enhanced file tree:', error);
-        throw error;
+        throw handleNavigationError(error, 'getEnhancedFileTree');
       }
     } else {
       console.log('🔧 Development mode: Using mock enhanced file tree');
@@ -535,67 +647,83 @@ export const api = {
             id: 'src',
             name: 'src',
             path: '/src',
-            type: 'directory',
+            node_type: 'directory',
             children: [
               {
                 id: 'src/components',
                 name: 'components',
                 path: '/src/components',
-                type: 'directory',
-                metadata: { symbolCount: 25, lastModified: new Date().toISOString() }
+                node_type: 'directory',
+                metadata: { 
+                  symbol_count: 25, 
+                  file_size: 0,
+                  last_modified: new Date().toISOString(),
+                  main_symbols: []
+                }
               }
-            ]
+            ],
+            metadata: {
+              symbol_count: 25,
+              file_size: 0,
+              last_modified: new Date().toISOString(),
+              main_symbols: []
+            }
           }
-        ]
+        ],
+        total_files: 15,
+        total_directories: 3,
+        analysis_time: '0.2s'
       };
     }
   },
 
   // Symbol usage analysis
-  async analyzeSymbolUsage(symbolId: string): Promise<any> {
+  async analyzeSymbolUsage(symbolId: string): Promise<SymbolUsageAnalysis> {
     if (isTauri()) {
       try {
-        return await invoke('analyze_symbol_usage', { symbolId });
+        return await invoke<SymbolUsageAnalysis>('analyze_symbol_usage', { symbolId });
       } catch (error) {
         console.error('Failed to analyze symbol usage:', error);
-        throw error;
+        throw handleNavigationError(error, 'analyzeSymbolUsage');
       }
     } else {
       console.log('🔧 Development mode: Using mock symbol usage');
       await new Promise(resolve => setTimeout(resolve, 500));
       return {
-        referenceCount: 12,
-        callCount: 8,
-        lastUsed: new Date().toISOString(),
-        usageFrequency: 0.75,
+        symbol: { identifier: symbolId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
+        reference_count: 12,
+        call_count: 8,
+        last_used: new Date().toISOString(),
+        usage_frequency: 0.75,
         hotspots: [
-          { filePath: '/src/auth.ts', position: { line: 23, column: 10 } },
-          { filePath: '/src/user.ts', position: { line: 45, column: 5 } }
+          { file_path: '/src/auth.ts', position: { line: 23, column: 10 }, usage_type: 'call', frequency: 5 },
+          { file_path: '/src/user.ts', position: { line: 45, column: 5 }, usage_type: 'reference', frequency: 3 }
         ]
       };
     }
   },
 
   // Navigation session management (enhanced)
-  async saveNavigationSession(projectPath: string, session: any): Promise<void> {
+  async saveNavigationSession(projectPath: string, session: NavigationSessionData): Promise<void> {
     if (isTauri()) {
       try {
         await invoke('save_navigation_session', { projectPath, session });
       } catch (error) {
         console.error('Failed to save navigation session:', error);
-        throw error;
+        throw handleNavigationError(error, 'saveNavigationSession');
       }
     } else {
       console.log('🔧 Development mode: Navigation session save simulated');
     }
   },
 
-  async loadNavigationSession(projectPath: string, sessionId?: string): Promise<any> {
+  async loadNavigationSession(projectPath: string, sessionId?: string): Promise<NavigationSessionData | null> {
     if (isTauri()) {
       try {
-        return await invoke('load_navigation_session', { projectPath, sessionId });
+        return await invoke<NavigationSessionData | null>('load_navigation_session', { projectPath, sessionId });
       } catch (error) {
         console.error('Failed to load navigation session:', error);
+        // Gracefully degrade for session loading
         return null;
       }
     } else {
@@ -605,12 +733,13 @@ export const api = {
     }
   },
 
-  async loadAllNavigationSessions(projectPath: string): Promise<any[]> {
+  async loadAllNavigationSessions(projectPath: string): Promise<NavigationSessionData[]> {
     if (isTauri()) {
       try {
-        return await invoke('load_all_navigation_sessions', { projectPath });
+        return await invoke<NavigationSessionData[]>('load_all_navigation_sessions', { projectPath });
       } catch (error) {
         console.error('Failed to load all navigation sessions:', error);
+        // Gracefully degrade to empty array
         return [];
       }
     } else {
@@ -626,7 +755,7 @@ export const api = {
         await invoke('delete_navigation_session', { projectPath, sessionId });
       } catch (error) {
         console.error('Failed to delete navigation session:', error);
-        throw error;
+        throw handleNavigationError(error, 'deleteNavigationSession');
       }
     } else {
       console.log('🔧 Development mode: Navigation session deletion simulated');
@@ -634,32 +763,35 @@ export const api = {
   },
 
   // Performance monitoring
-  async getNavigationMetrics(): Promise<any> {
+  async getNavigationMetrics(): Promise<NavigationMetrics | null> {
     if (isTauri()) {
       try {
-        return await invoke('get_navigation_metrics');
+        return await invoke<NavigationMetrics>('get_navigation_metrics');
       } catch (error) {
         console.error('Failed to get navigation metrics:', error);
+        // Gracefully degrade for metrics
         return null;
       }
     } else {
       console.log('🔧 Development mode: Using mock navigation metrics');
       return {
-        navigationResponseTime: 45,
-        memoryUsage: 128,
-        cacheHitRate: 0.85,
-        backgroundProcessingTime: 120
+        navigation_response_time: 45,
+        memory_usage: 128,
+        cache_hit_rate: 0.85,
+        background_processing_time: 120,
+        active_sessions: 1
       };
     }
   },
 
   // Git integration for navigation
-  async getFileGitStatus(filePath: string): Promise<any> {
+  async getFileGitStatus(filePath: string): Promise<GitFileStatus | null> {
     if (isTauri()) {
       try {
-        return await invoke('get_file_git_status', { filePath });
+        return await invoke<GitFileStatus | null>('get_file_git_status', { filePath });
       } catch (error) {
         console.error('Failed to get file git status:', error);
+        // Gracefully degrade for git status
         return null;
       }
     } else {
@@ -667,8 +799,22 @@ export const api = {
       return {
         status: 'modified',
         branch: 'main',
-        lastCommit: new Date(Date.now() - 86400000).toISOString()
+        last_commit: new Date(Date.now() - 86400000).toISOString()
       };
+    }
+  },
+
+  // Navigation data cleanup
+  async cleanupNavigationData(projectPath: string): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('cleanup_navigation_data', { projectPath });
+      } catch (error) {
+        console.error('Failed to cleanup navigation data:', error);
+        throw handleNavigationError(error, 'cleanupNavigationData');
+      }
+    } else {
+      console.log('🔧 Development mode: Navigation data cleanup simulated');
     }
   },
 
@@ -677,38 +823,39 @@ export const api = {
   // ============================================================================
 
   // Function-specific actions
-  async analyzeCallHierarchy(functionId: string): Promise<any> {
+  async analyzeCallHierarchy(functionId: string): Promise<CallHierarchyAnalysis> {
     if (isTauri()) {
       try {
-        return await invoke('analyze_call_hierarchy', { functionId });
+        return await invoke<CallHierarchyAnalysis>('analyze_call_hierarchy', { functionId });
       } catch (error) {
         console.error('Failed to analyze call hierarchy:', error);
-        throw error;
+        throw handleNavigationError(error, 'analyzeCallHierarchy');
       }
     } else {
       console.log('🔧 Development mode: Using mock call hierarchy');
       await new Promise(resolve => setTimeout(resolve, 1000));
       return {
-        function: { identifier: functionId, kind: 'TSFunction' },
+        function: { identifier: functionId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
         callers: [
-          { identifier: 'mainFunction', kind: 'TSFunction', callCount: 3 },
-          { identifier: 'helperFunction', kind: 'TSFunction', callCount: 1 }
+          { identifier: 'mainFunction', kind: 'TSFunction', location: { filePath: '/src/main.ts', position: { line: 15, column: 5 } }, call_count: 3 },
+          { identifier: 'helperFunction', kind: 'TSFunction', location: { filePath: '/src/helper.ts', position: { line: 8, column: 2 } }, call_count: 1 }
         ],
         callees: [
-          { identifier: 'utilityFunction', kind: 'TSFunction', callCount: 2 },
-          { identifier: 'validateInput', kind: 'TSFunction', callCount: 1 }
-        ]
+          { identifier: 'utilityFunction', kind: 'TSFunction', location: { filePath: '/src/utils.ts', position: { line: 20, column: 1 } }, call_count: 2 },
+          { identifier: 'validateInput', kind: 'TSFunction', location: { filePath: '/src/validation.ts', position: { line: 12, column: 1 } }, call_count: 1 }
+        ],
+        depth_analyzed: 2
       };
     }
   },
 
-  async findFunctionCallers(functionId: string): Promise<any[]> {
+  async findFunctionCallers(functionId: string): Promise<FunctionReference[]> {
     if (isTauri()) {
       try {
-        return await invoke('find_function_callers', { functionId });
+        return await invoke<FunctionReference[]>('find_function_callers', { functionId });
       } catch (error) {
         console.error('Failed to find function callers:', error);
-        throw error;
+        throw handleNavigationError(error, 'findFunctionCallers');
       }
     } else {
       console.log('🔧 Development mode: Using mock function callers');
@@ -717,14 +864,14 @@ export const api = {
         { 
           identifier: 'mainController', 
           kind: 'TSFunction', 
-          location: { path: '/src/controllers/main.ts', line: 25, column: 10 },
-          callCount: 3
+          location: { filePath: '/src/controllers/main.ts', position: { line: 25, column: 10 } },
+          call_count: 3
         },
         { 
           identifier: 'authMiddleware', 
           kind: 'TSFunction', 
-          location: { path: '/src/middleware/auth.ts', line: 15, column: 5 },
-          callCount: 1
+          location: { filePath: '/src/middleware/auth.ts', position: { line: 15, column: 5 } },
+          call_count: 1
         }
       ];
     }
@@ -780,26 +927,26 @@ export const api = {
   },
 
   // Class-specific actions
-  async analyzeInheritanceHierarchy(classId: string): Promise<any> {
+  async analyzeInheritanceHierarchy(classId: string): Promise<InheritanceHierarchyAnalysis> {
     if (isTauri()) {
       try {
-        return await invoke('analyze_inheritance_hierarchy', { classId });
+        return await invoke<InheritanceHierarchyAnalysis>('analyze_inheritance_hierarchy', { classId });
       } catch (error) {
         console.error('Failed to analyze inheritance hierarchy:', error);
-        throw error;
+        throw handleNavigationError(error, 'analyzeInheritanceHierarchy');
       }
     } else {
       console.log('🔧 Development mode: Using mock inheritance hierarchy');
       await new Promise(resolve => setTimeout(resolve, 1200));
       return {
-        class: { identifier: classId, kind: 'TSClass' },
+        class: { identifier: classId, kind: 'TSClass', location: { path: '/src/test.ts', line: 10, column: 1 } },
         parents: [
-          { identifier: 'BaseClass', kind: 'TSClass', relationship: 'extends' },
-          { identifier: 'IUserInterface', kind: 'TSInterface', relationship: 'implements' }
+          { identifier: 'BaseClass', kind: 'TSClass', relationship: 'extends', location: { filePath: '/src/base.ts', position: { line: 5, column: 1 } } },
+          { identifier: 'IUserInterface', kind: 'TSInterface', relationship: 'implements', location: { filePath: '/src/interfaces.ts', position: { line: 15, column: 1 } } }
         ],
         children: [
-          { identifier: 'AdminUser', kind: 'TSClass', relationship: 'extends' },
-          { identifier: 'GuestUser', kind: 'TSClass', relationship: 'extends' }
+          { identifier: 'AdminUser', kind: 'TSClass', relationship: 'extends', location: { filePath: '/src/admin.ts', position: { line: 8, column: 1 } } },
+          { identifier: 'GuestUser', kind: 'TSClass', relationship: 'extends', location: { filePath: '/src/guest.ts', position: { line: 12, column: 1 } } }
         ],
         depth: 3,
         breadth: 5
@@ -807,13 +954,13 @@ export const api = {
     }
   },
 
-  async getClassMembers(classId: string): Promise<any[]> {
+  async getClassMembers(classId: string): Promise<ClassMember[]> {
     if (isTauri()) {
       try {
-        return await invoke('get_class_members', { classId });
+        return await invoke<ClassMember[]>('get_class_members', { classId });
       } catch (error) {
         console.error('Failed to get class members:', error);
-        throw error;
+        throw handleNavigationError(error, 'getClassMembers');
       }
     } else {
       console.log('🔧 Development mode: Using mock class members');
@@ -823,41 +970,41 @@ export const api = {
           identifier: 'constructor',
           kind: 'TSFunction',
           accessibility: 'public',
-          isStatic: false,
+          is_static: false,
           parameters: ['name: string', 'email: string']
         },
         {
           identifier: 'getName',
           kind: 'TSFunction',
           accessibility: 'public',
-          isStatic: false,
-          returnType: 'string'
+          is_static: false,
+          return_type: 'string'
         },
         {
           identifier: 'setEmail',
           kind: 'TSFunction',
           accessibility: 'public',
-          isStatic: false,
+          is_static: false,
           parameters: ['email: string']
         },
         {
           identifier: 'id',
           kind: 'Property',
           accessibility: 'private',
-          isStatic: false,
+          is_static: false,
           type: 'string'
         }
       ];
     }
   },
 
-  async findImplementations(interfaceId: string): Promise<any[]> {
+  async findImplementations(interfaceId: string): Promise<Implementation[]> {
     if (isTauri()) {
       try {
-        return await invoke('find_implementations', { interfaceId });
+        return await invoke<Implementation[]>('find_implementations', { interfaceId });
       } catch (error) {
         console.error('Failed to find implementations:', error);
-        throw error;
+        throw handleNavigationError(error, 'findImplementations');
       }
     } else {
       console.log('🔧 Development mode: Using mock implementations');
@@ -866,14 +1013,14 @@ export const api = {
         {
           identifier: 'UserService',
           kind: 'TSClass',
-          location: { path: '/src/services/user.ts', line: 10, column: 1 },
-          implementsInterface: interfaceId
+          location: { filePath: '/src/services/user.ts', position: { line: 10, column: 1 } },
+          implements_interface: interfaceId
         },
         {
           identifier: 'AdminService',
           kind: 'TSClass',
-          location: { path: '/src/services/admin.ts', line: 15, column: 1 },
-          implementsInterface: interfaceId
+          location: { filePath: '/src/services/admin.ts', position: { line: 15, column: 1 } },
+          implements_interface: interfaceId
         }
       ];
     }
@@ -934,4 +1081,3 @@ export const api = {
 };
 
 // Utility to check current mode
-export const isDevelopmentMode = () => !isTauri();

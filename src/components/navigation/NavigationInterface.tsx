@@ -28,6 +28,8 @@ import {
 import { VisualMinimap } from './VisualMinimap';
 import { SymbolRelationshipGraph } from './SymbolRelationshipGraph';
 import { EnhancedFileTree } from './EnhancedFileTree';
+import { NavigationErrorDisplay } from './NavigationErrorDisplay';
+import { useNavigationErrorHandler } from '../../hooks/useNavigationErrorHandler';
 import { QuickActionToolbar } from './QuickActionToolbar';
 import { BreadcrumbNavigation } from './BreadcrumbNavigation';
 import { api } from '../../api';
@@ -56,6 +58,23 @@ export function NavigationInterface({
   const [selectedSymbol, setSelectedSymbol] = useState<Symbol | null>(null);
   const [minimapData, setMinimapData] = useState<any>(null);
   const [, setFileStructure] = useState<any>(null);
+
+  // Error handling
+  const { 
+    errorState, 
+    handleError, 
+    clearError, 
+    retry, 
+    canRetry,
+    isError,
+ 
+  } = useNavigationErrorHandler({
+    onError: (error) => {
+      console.error('Navigation error occurred:', error);
+    },
+    maxRetries: 3,
+    enableAutoRecovery: true
+  });
 
   // Initialize navigation interface with default layout
   useEffect(() => {
@@ -132,7 +151,7 @@ export function NavigationInterface({
         
         // Create minimap data from structure
         const minimapData = {
-          symbolMap: structure.symbolDensity,
+          symbolMap: structure.symbol_density,
           structureOutline: structure.outline,
           visibleRegion: {
             startLine: Math.max(0, (currentLocation?.position.line || 10) - 20),
@@ -154,36 +173,39 @@ export function NavigationInterface({
           }
         }
       } catch (error) {
-        console.error('Failed to load minimap data:', error);
-        // Provide fallback data to prevent loading state
-        setMinimapData({
-          symbolMap: {
-            regions: [
-              {
-                startLine: 0,
-                endLine: 50,
-                density: 0.3,
-                symbolTypes: new Map([['TSFunction', 2], ['TSClass', 1]]),
-                complexity: 5
-              }
-            ],
-            maxDensity: 1,
-            totalSymbols: 3,
-            lastUpdated: new Date()
-          },
-          structureOutline: {
-            outline: [],
-            totalNodes: 50
-          },
-          visibleRegion: {
-            startLine: 0,
-            endLine: 50,
-            startColumn: 0,
-            endColumn: 100
-          },
-          zoomLevel: minimapZoom,
-          renderCache: new Map()
-        });
+        const navError = await handleError(error, 'load minimap data');
+        
+        // Provide fallback data to prevent loading state if we can continue
+        if (navError.can_continue) {
+          setMinimapData({
+            symbolMap: {
+              regions: [
+                {
+                  startLine: 0,
+                  endLine: 50,
+                  density: 0.3,
+                  symbolTypes: new Map([['TSFunction', 2], ['TSClass', 1]]),
+                  complexity: 5
+                }
+              ],
+              maxDensity: 1,
+              totalSymbols: 3,
+              lastUpdated: new Date()
+            },
+            structureOutline: {
+              outline: [],
+              totalNodes: 50
+            },
+            visibleRegion: {
+              startLine: 0,
+              endLine: 50,
+              startColumn: 0,
+              endColumn: 100
+            },
+            zoomLevel: minimapZoom,
+            renderCache: new Map()
+          });
+        }
       }
     };
 
@@ -332,6 +354,18 @@ export function NavigationInterface({
 
   return (
     <div className={`enhanced-navigation-interface h-full flex flex-col ${className}`}>
+      {/* Error Display */}
+      {isError && errorState.error && (
+        <NavigationErrorDisplay
+          error={errorState.error}
+          onRetry={() => retry(loadMinimapData)}
+          onDismiss={clearError}
+          canRetry={canRetry()}
+          isRecovering={errorState.isRecovering}
+          className="m-3"
+        />
+      )}
+
       {/* Navigation Header - Enhanced Breadcrumbs */}
       <div className="navigation-header border-b bg-background p-3">
         <div className="flex items-center gap-2">

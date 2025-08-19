@@ -35,3 +35,37 @@ pub use model::navigation_session::{
     Symbol as NavSymbol, UIState, CacheState, MinimapSettings, FileTreeSettings,
     BreadcrumbSegment as NavBreadcrumb, NavigationPanel
 };
+
+// Re-export analysis types
+pub use model::analysis::{
+    FileStructureAnalysis, StructureNode, StructureNodeType, SymbolDensityMap, DensityRegion,
+    FileMetadata, AnalysisSymbol, SymbolType, SymbolVisibility, RelationshipAnalysis,
+    SymbolRelationship, RelationshipType, CodeLocation, SymbolUsageAnalysis, UsageHotspot,
+    UsageType, CallHierarchyAnalysis, FunctionReference, InheritanceHierarchyAnalysis,
+    ClassMemberAnalysis, ImplementationAnalysis
+};
+
+// Re-export file tree types
+pub use model::file_tree::{
+    EnhancedFileTree, FileTreeNode, FileNodeType, FileNodeMetadata, GitStatus,
+    FileTreeOptions, FileSortOrder, FileTreeStatistics
+};
+
+// Re-export performance types
+pub use model::performance::{
+    NavigationMetrics, OperationMetrics, SystemResourceMetrics, CacheStatistics,
+    PerformanceConfig, PerformanceAlert, AlertType, AlertSeverity, BenchmarkResult,
+    PerformanceReport, PerformanceSummary, PerformanceGrade
+};
+
+// Re-export migration types
+pub use model::migration::{
+    SchemaVersion, MigrationConfig, MigrationInfo, MigrationResult, ValidationResults,
+    ValidationError, DataTypeSchema, FieldDefinition, FieldDataType, FieldConstraint
+};
+
+// Re-export serialization types
+pub use model::serialization::{
+    SerializationFormat, SerializationConfig, SerializationMetadata, NavigationSerializer,
+    SerializationResult, DeserializationResult
+};

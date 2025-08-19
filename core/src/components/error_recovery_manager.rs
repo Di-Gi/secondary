@@ -35,7 +35,7 @@ impl Default for ErrorRecoveryConfig {
 }
 
 /// Statistics about error recovery operations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ErrorRecoveryStats {
     pub total_errors: u64,
     pub successful_recoveries: u64,
@@ -59,7 +59,7 @@ impl Default for ErrorRecoveryStats {
 }
 
 /// Error pattern tracking for identifying recurring issues
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ErrorPattern {
     pub error_type: String,
     pub component: String,

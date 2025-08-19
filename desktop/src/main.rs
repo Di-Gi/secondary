@@ -24,6 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .manage(AppState {
             current_project: Mutex::new(None),
             navigation_cache: Mutex::new(secondary_mind_core::components::navigation_cache::NavigationCache::new()),
+            error_recovery_manager: secondary_mind_core::components::error_recovery_manager::ErrorRecoveryManager::default(),
         })
         .invoke_handler(tauri::generate_handler![
             commands::initialize_app,
@@ -60,7 +61,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::get_file_git_status,
             commands::get_files_git_status,
             commands::is_git_repository,
-            commands::get_git_repository_root
+            commands::get_git_repository_root,
+            commands::get_error_recovery_stats,
+            commands::get_error_patterns,
+            commands::reset_error_stats,
+            commands::test_error_recovery,
+            commands::configure_error_logging
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]

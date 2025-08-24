@@ -265,5 +265,30 @@ pub async fn delete_project_note(
     
     Ok(())
 }
+
+#[tauri::command]
+pub async fn read_file_content(
+    file_path: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let project_guard = state.current_project.lock().unwrap();
+    let project = project_guard.as_ref().ok_or("No project currently loaded")?;
+    
+    // Resolve relative path against project root
+    let full_path = if std::path::Path::new(&file_path).is_absolute() {
+        PathBuf::from(&file_path)
+    } else {
+        project.root.join(&file_path)
+    };
+    
+    // Security check: ensure file is within project directory
+    if !full_path.starts_with(&project.root) {
+        return Err("File access denied: outside project directory".to_string());
+    }
+    
+    tokio::fs::read_to_string(&full_path).await.map_err(|e| {
+        format!("Failed to read file {}: {}", full_path.display(), e)
+    })
+}
 // Integration: [Imports `Symbol` directly from `secondary-mind-core`, eliminating the redundant local model. The `scan_project_for_symbols` helper now correctly uses the refactored `CodebaseCartographer`.]
 // Notes: [The local `desktop/src/model` directory can now be safely deleted as it is no longer used.]

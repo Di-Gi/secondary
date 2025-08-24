@@ -7,6 +7,8 @@ import { Symbol } from '../api';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
+import { Button } from './ui/button';
+import { CodeViewer } from './CodeViewer';
 import { 
   Search, 
   FileText, 
@@ -18,7 +20,8 @@ import {
   Spline, 
   Component, 
   FunctionSquare, 
-  TerminalSquare 
+  TerminalSquare,
+  Eye
 } from 'lucide-react';
 
 interface SymbolExplorerProps {
@@ -29,6 +32,7 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<Symbol | null>(null);
+  const [viewingSymbol, setViewingSymbol] = useState<Symbol | null>(null);
 
   const filteredSymbols = useMemo(() => {
     return symbols.filter(symbol => {
@@ -149,17 +153,19 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
           {filteredSymbols.map((symbol, index) => (
             <Card 
               key={`${symbol.location.path}-${symbol.identifier}-${symbol.location.line}-${index}`}
-              className={`cursor-pointer transition-all hover:shadow-md ${
+              className={`transition-all hover:shadow-md ${
                 selectedSymbol === symbol ? 'ring-2 ring-blue-500 bg-blue-50' : ''
               }`}
-              onClick={() => setSelectedSymbol(symbol)}
             >
               <CardContent className="p-3">
                 <div className="flex items-start gap-3">
                   <div className={`p-1 rounded ${getSymbolColor(symbol.kind)}`}>
                     {getSymbolIcon(symbol.kind)}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div 
+                    className="flex-1 min-w-0 cursor-pointer"
+                    onClick={() => setSelectedSymbol(symbol)}
+                  >
                     <div className="font-medium text-sm truncate">
                       {symbol.identifier}
                     </div>
@@ -170,6 +176,18 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
                       {formatKind(symbol.kind)}
                     </Badge>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setViewingSymbol(symbol);
+                    }}
+                    className="text-gray-500 hover:text-blue-600 p-1 h-auto"
+                    title="Go to Definition"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -205,6 +223,18 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
                 Path: {selectedSymbol.location.path}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Code Viewer Modal */}
+      {viewingSymbol && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-auto">
+            <CodeViewer
+              symbol={viewingSymbol}
+              onClose={() => setViewingSymbol(null)}
+            />
           </div>
         </div>
       )}

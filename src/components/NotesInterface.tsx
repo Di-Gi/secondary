@@ -3,10 +3,9 @@
 // Architecture: Updated to use the persistent storage system for automatic note saving and loading per project.
 // Dependencies: Enhanced app store with note persistence, existing UI components, improved state management.
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store/appStore';
 import { ProjectNote } from '../api';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -17,13 +16,8 @@ import {
   Search, 
   Plus, 
   FileText, 
-  Hash, 
-  Calendar, 
   Clock, 
   Star, 
-  Archive, 
-  MoreHorizontal,
-  Save,
   Trash2,
   FolderOpen,
   Loader2
@@ -62,7 +56,7 @@ export function NotesInterface() {
   // Refs
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const saveTimeoutRef = useRef<number>();
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Load notes when project changes
   useEffect(() => {

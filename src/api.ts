@@ -296,6 +296,31 @@ export const api = {
       console.log('🔧 Development mode: Note deletion simulated');
     }
   },
+
+  async readFileContent(filePath: string): Promise<string> {
+    if (isTauri()) {
+      try {
+        return await invoke<string>('read_file_content', { filePath });
+      } catch (error) {
+        console.error('Failed to read file:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock file content');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return `// Mock file content for: ${filePath}
+export class UserService {
+  constructor() {
+    // Mock implementation
+  }
+  
+  async authenticateUser(credentials: any) {
+    // Authentication logic here
+    return { success: true };
+  }
+}`;
+    }
+  },
 };
 
 // Utility to check current mode

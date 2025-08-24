@@ -60,23 +60,33 @@
 
 ## Development Process
 
-### Before Starting
-1. Clearly define the user problem being solved
-2. Identify the minimal viable solution
-3. Check existing codebase for similar patterns
-4. Plan the complete user workflow
+### Problem Definition Phase
+1. Clearly articulate the specific user problem being solved
+2. Identify the minimal solution that delivers complete user value
+3. Analyze existing codebase for similar patterns and reusable components
+4. Map out the complete user workflow from start to finish
+5. Define success criteria based on user value, not arbitrary metrics
 
-### During Implementation
-1. Implement the happy path first
-2. Add error handling and edge cases
-3. Test the feature as a user would
-4. Refactor for consistency with existing code
+### Implementation Phase
+1. Build the core user workflow first (happy path)
+2. Implement error handling and edge cases
+3. Validate feature behavior from user perspective
+4. Refactor for consistency with existing codebase patterns
+5. Ensure feature integrates seamlessly with existing functionality
 
-### Before Completion
-1. Verify the feature solves the original problem
-2. Ensure no regressions in existing functionality
-3. Check for over-engineering and simplify if needed
-4. Document any new patterns or conventions
+### Validation Phase
+1. Verify the feature completely solves the identified user problem
+2. Confirm no existing functionality is broken or degraded
+3. Eliminate unnecessary complexity and over-engineering
+4. Test all user workflows end-to-end
+5. Validate that success criteria are met
+
+### Completion Phase
+1. Document implementation decisions and trade-offs made
+2. Identify reusable patterns created or discovered
+3. Note opportunities for future enhancement or optimization
+4. Capture lessons learned for future development
+5. Consider how this feature enables or constrains future development
 
 ## Anti-Patterns to Avoid
 
@@ -97,22 +107,46 @@
 - Complex state management for simple features
 - Poor error handling or user feedback
 
-## Success Metrics
+### Arbitrary Constraints
+- Time-based implementation deadlines that compromise quality
+- Percentage-based success metrics that don't reflect user value
+- Feature scope driven by arbitrary milestones rather than user needs
+- Performance targets that exceed actual user requirements
 
-### Code Quality
+### Premature Optimization
+- Optimizing for theoretical performance problems
+- Complex caching strategies before identifying actual bottlenecks
+- Over-architecting for scale that may never be needed
+- Choosing complex solutions for simple problems
+
+## Success Criteria
+
+### Functional Completeness
 - Features work completely on first implementation
 - No regressions in existing functionality
-- Consistent patterns across the codebase
-- Clear, readable code that other developers can understand
+- All user workflows function end-to-end
+- Error states and edge cases are handled appropriately
 
-### User Experience
-- Features solve real user problems
-- Intuitive interfaces that don't require documentation
-- Fast, responsive interactions
-- Helpful error messages and feedback
+### User Value Delivery
+- Features solve clearly defined user problems
+- Interfaces are intuitive and require no explanation
+- Interactions feel responsive and natural
+- Users can accomplish their goals without friction
 
-### Maintainability
-- Easy to modify or extend features
-- Clear separation of concerns
-- Minimal coupling between components
-- Self-documenting code structure
+### Technical Excellence
+- Code follows established patterns consistently
+- Components are focused and reusable
+- State management is appropriate to complexity
+- Performance is suitable for intended use
+
+### Design Quality
+- Features integrate seamlessly with existing UI
+- Visual hierarchy guides user attention appropriately
+- Information architecture supports user mental models
+- Accessibility standards are met
+
+### Knowledge Capture
+- Implementation decisions and trade-offs are documented
+- Reusable patterns are identified and catalogued
+- Future enhancement opportunities are noted
+- Lessons learned inform subsequent development

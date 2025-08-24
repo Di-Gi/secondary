@@ -39,3 +39,20 @@
 - [ ] Consistent with existing UI patterns
 - [ ] No console errors or warnings
 - [ ] User can discover and use the feature intuitively
+
+## Completion Checklist
+- [ ] All Definition of Done items completed
+- [ ] Feature tested in development mode
+- [ ] No regressions in existing functionality
+- [ ] Implementation notes added below
+- [ ] Future enhancement opportunities identified
+- [ ] Ready to move to `.kiro/completed-tasks/`
+
+## Implementation Notes
+*(Add notes about implementation decisions, challenges overcome, patterns used)*
+
+## Future Enhancements
+*(Ideas for extending this feature or related improvements)*
+
+## Lessons Learned
+*(What worked well, what could be improved in future similar tasks)*

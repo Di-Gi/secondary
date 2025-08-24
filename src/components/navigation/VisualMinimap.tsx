@@ -1009,7 +1009,7 @@ export function VisualMinimap({
           </div>
 
           {/* Symbol Types */}
-          {hoveredRegion.symbolTypes.size > 0 && (
+          {hoveredRegion.symbolTypes && hoveredRegion.symbolTypes.size > 0 && (
             <div className="mb-2">
               <div className="text-gray-400 mb-1">Symbol Types:</div>
               <div className="space-y-1">
@@ -1068,7 +1068,7 @@ export function VisualMinimap({
           <div className="text-gray-400 mb-1">Symbol Types:</div>
           <div className="flex flex-wrap gap-1">
             {Array.from(new Set(
-              symbolDensity.regions.flatMap(r => Array.from(r.symbolTypes.keys()))
+              symbolDensity.regions.flatMap(r => r.symbolTypes ? Array.from(r.symbolTypes.keys()) : [])
             )).map(symbolType => (
               <div key={symbolType} className="flex items-center gap-1">
                 <div

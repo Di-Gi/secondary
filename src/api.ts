@@ -3,10 +3,10 @@
 // Architecture: [This file defines the contract between the frontend and the Tauri backend. The `Symbol` interface is updated to include Rust-specific kinds, aligning with the core Rust model.]
 // Dependencies: [@tauri-apps/api/tauri for backend invocation.]
 import { invoke } from '@tauri-apps/api/tauri';
-import { 
-  FileStructureAnalysis, 
-  RelationshipAnalysis, 
-  EnhancedFileTree, 
+import {
+  FileStructureAnalysis,
+  RelationshipAnalysis,
+  EnhancedFileTree,
   NavigationHistoryData,
   NavigationSessionData,
   SymbolUsageAnalysis,
@@ -26,21 +26,21 @@ import {
 // Enhanced type definitions to include Rust symbols
 export interface Symbol {
   identifier: string;
-  kind: 
-    // TypeScript / JavaScript
-    | 'TSFunction' 
-    | 'TSClass' 
-    | 'TSInterface'
-    // Rust
-    | 'Struct'
-    | 'Enum'
-    | 'Trait'
-    | 'Function'
-    | 'Impl'
-    | 'Module'
-    | 'Macro'
-    // Generic
-    | 'Unknown';
+  kind:
+  // TypeScript / JavaScript
+  | 'TSFunction'
+  | 'TSClass'
+  | 'TSInterface'
+  // Rust
+  | 'Struct'
+  | 'Enum'
+  | 'Trait'
+  | 'Function'
+  | 'Impl'
+  | 'Module'
+  | 'Macro'
+  // Generic
+  | 'Unknown';
   location: {
     path: string;
     line: number;
@@ -148,7 +148,7 @@ const isTauri = () => {
 };
 
 // Check if we're in development mode
-const isDevelopmentMode = () => {
+export const isDevelopmentMode = () => {
   return !isTauri() || process.env.NODE_ENV === 'development';
 };
 
@@ -199,7 +199,7 @@ const MOCK_RECENT_PROJECTS: RecentProjects = {
       },
     },
     {
-      id: 'mock2', 
+      id: 'mock2',
       name: 'API Gateway',
       path: '/Users/dev/projects/api-gateway',
       created_at: new Date(Date.now() - 86400000 * 14).toISOString(),
@@ -250,17 +250,17 @@ const handleNavigationError = (error: any, operation: string): NavigationError =
       can_continue: error.can_continue || false
     };
   }
-  
+
   // Handle string errors or unknown errors
   const errorMessage = typeof error === 'string' ? error : error?.message || 'Unknown error';
-  
+
   // Map common error patterns to NavigationErrorType
   let errorType: NavigationErrorType = 'UNKNOWN_ERROR';
   if (errorMessage.includes('not found')) errorType = 'FILE_NOT_FOUND';
   else if (errorMessage.includes('permission')) errorType = 'PERMISSION_DENIED';
   else if (errorMessage.includes('timeout')) errorType = 'ANALYSIS_TIMEOUT';
   else if (errorMessage.includes('memory')) errorType = 'MEMORY_LIMIT_EXCEEDED';
-  
+
   return {
     code: errorType,
     message: errorMessage,
@@ -417,7 +417,7 @@ export const api = {
       console.log('🔧 Development mode: Note deletion simulated');
     }
   },
-  
+
   // Session management API functions
   async saveSession(projectPath: string, sessionData: any): Promise<void> {
     if (isTauri()) {
@@ -441,8 +441,8 @@ export const api = {
       } catch (error) {
         // The error "command not found" is a valid result here if the command doesn't exist
         if (typeof error === 'string' && error.includes('not found')) {
-            console.warn(`Command 'load_session' not found, treating as no session.`);
-            return null;
+          console.warn(`Command 'load_session' not found, treating as no session.`);
+          return null;
         }
         console.error('Failed to load session:', error);
         throw error;
@@ -459,17 +459,17 @@ export const api = {
   async deleteSession(_projectId: string): Promise<void> {
     console.warn(`[API] The 'delete_session' command is not implemented in the backend.`);
     if (!isTauri()) {
-        console.log('🔧 Development mode: Session deletion simulated');
+      console.log('🔧 Development mode: Session deletion simulated');
     }
   },
 
   async listSessions(): Promise<any[]> {
-      console.warn(`[API] The 'list_sessions' command is not implemented in the backend.`);
-      if (!isTauri()) {
-          console.log('🔧 Development mode: Using mock session list (empty)');
-          return [];
-      }
+    console.warn(`[API] The 'list_sessions' command is not implemented in the backend.`);
+    if (!isTauri()) {
+      console.log('🔧 Development mode: Using mock session list (empty)');
       return [];
+    }
+    return [];
   },
 
   // Enhanced search functionality
@@ -537,17 +537,17 @@ export const api = {
       return {
         center_symbol: { identifier: symbolId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
         relationships: [
-          { 
-            relationship_type: 'calls', 
+          {
+            relationship_type: 'calls',
             source: { identifier: symbolId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
-            target: { identifier: 'helperFunction', kind: 'TSFunction', location: { path: '/src/helper.ts', line: 5, column: 1 } }, 
+            target: { identifier: 'helperFunction', kind: 'TSFunction', location: { path: '/src/helper.ts', line: 5, column: 1 } },
             strength: 0.8,
             locations: []
           },
-          { 
-            relationship_type: 'references', 
+          {
+            relationship_type: 'references',
             source: { identifier: symbolId, kind: 'TSFunction', location: { path: '/src/test.ts', line: 10, column: 1 } },
-            target: { identifier: 'UserInterface', kind: 'TSInterface', location: { path: '/src/types.ts', line: 15, column: 1 } }, 
+            target: { identifier: 'UserInterface', kind: 'TSInterface', location: { path: '/src/types.ts', line: 15, column: 1 } },
             strength: 0.6,
             locations: []
           }
@@ -573,12 +573,14 @@ export const api = {
       return {
         outline: [
           { name: 'imports', node_type: 'section', start_line: 1, end_line: 5, children: [] },
-          { name: 'UserService', node_type: 'class', start_line: 7, end_line: 45, children: [
-            { name: 'constructor', node_type: 'method', start_line: 8, end_line: 12, children: [] },
-            { name: 'authenticate', node_type: 'method', start_line: 14, end_line: 25, children: [] }
-          ]}
+          {
+            name: 'UserService', node_type: 'class', start_line: 7, end_line: 45, children: [
+              { name: 'constructor', node_type: 'method', start_line: 8, end_line: 12, children: [] },
+              { name: 'authenticate', node_type: 'method', start_line: 14, end_line: 25, children: [] }
+            ]
+          }
         ],
-        symbol_density: { 
+        symbol_density: {
           regions: [{ start_line: 1, end_line: 50, density: 0.3, symbol_types: { 'class': 1, 'method': 2 } }],
           max_density: 0.3,
           total_symbols: 3,
@@ -654,8 +656,8 @@ export const api = {
                 name: 'components',
                 path: '/src/components',
                 node_type: 'directory',
-                metadata: { 
-                  symbol_count: 25, 
+                metadata: {
+                  symbol_count: 25,
                   file_size: 0,
                   last_modified: new Date().toISOString(),
                   main_symbols: []
@@ -861,15 +863,15 @@ export const api = {
       console.log('🔧 Development mode: Using mock function callers');
       await new Promise(resolve => setTimeout(resolve, 800));
       return [
-        { 
-          identifier: 'mainController', 
-          kind: 'TSFunction', 
+        {
+          identifier: 'mainController',
+          kind: 'TSFunction',
           location: { filePath: '/src/controllers/main.ts', position: { line: 25, column: 10 } },
           call_count: 3
         },
-        { 
-          identifier: 'authMiddleware', 
-          kind: 'TSFunction', 
+        {
+          identifier: 'authMiddleware',
+          kind: 'TSFunction',
           location: { filePath: '/src/middleware/auth.ts', position: { line: 15, column: 5 } },
           call_count: 1
         }

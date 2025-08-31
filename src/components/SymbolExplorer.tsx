@@ -1,12 +1,11 @@
 // [[PROJECT_NAME]]/src/components/SymbolExplorer.tsx
-// Purpose: [Interactive component for browsing codebase symbols, now with support for displaying Rust symbols.]
-// Architecture: [Updated to recognize and render new `SymbolKind` variants for Rust, with distinct icons and colors to differentiate them from TypeScript/JavaScript symbols.]
-// Dependencies: [React, Symbol type from api.ts, lucide-react for icons, UI components.]
+// Purpose: Interactive component for browsing codebase symbols with improved layout and density modes
+// Architecture: Enhanced with three density modes, smart actions, and better information hierarchy
+// Dependencies: React, Symbol type from api.ts, lucide-react for icons, UI components, dropdown menu
 import { useState, useMemo } from 'react';
 import { Symbol } from '../api';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { CodeViewer } from './CodeViewer';
 import { ContextPanel } from './ContextPanel';
@@ -23,8 +22,23 @@ import {
   FunctionSquare, 
   TerminalSquare,
   Eye,
-  Zap
+  Zap,
+  MoreHorizontal,
+  Grid3X3,
+  List,
+  Rows3,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+
+type DensityMode = 'compact' | 'comfortable' | 'detailed';
 
 interface SymbolExplorerProps {
   symbols: Symbol[];
@@ -35,6 +49,8 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<Symbol | null>(null);
   const [viewingSymbol, setViewingSymbol] = useState<Symbol | null>(null);
+  const [densityMode, setDensityMode] = useState<DensityMode>('comfortable');
+  const [showContextInline, setShowContextInline] = useState(false);
 
   const filteredSymbols = useMemo(() => {
     return symbols.filter(symbol => {
@@ -114,123 +130,344 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
     return kind;
   };
 
+  const getDensityIcon = (mode: DensityMode) => {
+    switch (mode) {
+      case 'compact': return <Rows3 className="h-4 w-4" />;
+      case 'comfortable': return <List className="h-4 w-4" />;
+      case 'detailed': return <Grid3X3 className="h-4 w-4" />;
+    }
+  };
+
+  const handleSymbolAction = (symbol: Symbol, action: 'view' | 'context' | 'copy' | 'references') => {
+    switch (action) {
+      case 'view':
+        setViewingSymbol(symbol);
+        break;
+      case 'context':
+        setSelectedSymbol(symbol);
+        setShowContextInline(true);
+        break;
+      case 'copy':
+        navigator.clipboard.writeText(symbol.location.path);
+        break;
+      case 'references':
+        // TODO: Implement find references functionality
+        console.log('Find references for:', symbol.identifier);
+        break;
+    }
+  };
+
+  const renderSymbolItem = (symbol: Symbol, index: number) => {
+    const isSelected = selectedSymbol === symbol;
+    const fileName = symbol.location.path.split('/').pop();
+    
+    switch (densityMode) {
+      case 'compact':
+        return (
+          <div
+            key={`${symbol.location.path}-${symbol.identifier}-${symbol.location.line}-${index}`}
+            className={`group flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer border-l-2 transition-all ${
+              isSelected ? 'border-l-blue-500 bg-blue-50' : 'border-l-transparent'
+            }`}
+            onClick={() => setSelectedSymbol(symbol)}
+          >
+            <div className={`p-0.5 rounded ${getSymbolColor(symbol.kind)}`}>
+              {getSymbolIcon(symbol.kind)}
+            </div>
+            <span className="font-medium text-sm truncate flex-1">
+              {symbol.identifier}
+            </span>
+            <span className="text-xs text-gray-400 flex-shrink-0">
+              {fileName}:{symbol.location.line}
+            </span>
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <MoreHorizontal className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'view')}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Definition
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'context')}>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Show Context
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'references')}>
+                    <Search className="h-4 w-4 mr-2" />
+                    Find References
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'copy')}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Path
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        );
+
+      case 'comfortable':
+        return (
+          <div
+            key={`${symbol.location.path}-${symbol.identifier}-${symbol.location.line}-${index}`}
+            className={`group flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer border-l-2 transition-all ${
+              isSelected ? 'border-l-blue-500 bg-blue-50' : 'border-l-transparent'
+            }`}
+            onClick={() => setSelectedSymbol(symbol)}
+          >
+            <div className={`p-1 rounded ${getSymbolColor(symbol.kind)}`}>
+              {getSymbolIcon(symbol.kind)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm truncate">
+                {symbol.identifier}
+              </div>
+              <div className="text-xs text-gray-500 truncate">
+                {fileName}:{symbol.location.line}
+              </div>
+            </div>
+            <Badge variant="outline" className="text-xs">
+              {formatKind(symbol.kind)}
+            </Badge>
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <MoreHorizontal className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'view')}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Definition
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'context')}>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Show Context
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'references')}>
+                    <Search className="h-4 w-4 mr-2" />
+                    Find References
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'copy')}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Path
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        );
+
+      case 'detailed':
+        return (
+          <div
+            key={`${symbol.location.path}-${symbol.identifier}-${symbol.location.line}-${index}`}
+            className={`group p-3 hover:bg-gray-50 cursor-pointer border-l-2 transition-all border rounded-lg mx-2 mb-2 ${
+              isSelected ? 'border-l-blue-500 bg-blue-50 border-blue-200' : 'border-l-transparent border-gray-200'
+            }`}
+            onClick={() => setSelectedSymbol(symbol)}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`p-1 rounded ${getSymbolColor(symbol.kind)}`}>
+                {getSymbolIcon(symbol.kind)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm truncate mb-1">
+                  {symbol.identifier}
+                </div>
+                <div className="text-xs text-gray-500 truncate mb-2">
+                  {symbol.location.path.split('/').pop()}:{symbol.location.line}
+                </div>
+                <div className="flex items-center justify-between">
+                  <Badge variant="secondary" className="text-xs">
+                    {formatKind(symbol.kind)}
+                  </Badge>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSymbolAction(symbol, 'context');
+                      }}
+                      className="h-6 w-6 p-0"
+                      title="Show Context"
+                    >
+                      <Zap className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSymbolAction(symbol, 'view');
+                      }}
+                      className="h-6 w-6 p-0"
+                      title="View Definition"
+                    >
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                          <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'references')}>
+                          <Search className="h-4 w-4 mr-2" />
+                          Find References
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'copy')}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy Path
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleSymbolAction(symbol, 'view')}>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open in Editor
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
-      {/* Search and Filters */}
-      <div className="p-4 space-y-3">
+      {/* Header with Search and Controls */}
+      <div className="p-3 space-y-3 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium text-sm">Symbols</h3>
+          <div className="flex items-center gap-1">
+            {(['compact', 'comfortable', 'detailed'] as DensityMode[]).map((mode) => (
+              <Button
+                key={mode}
+                variant={densityMode === mode ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setDensityMode(mode)}
+                className="h-7 w-7 p-0"
+                title={`${mode} view`}
+              >
+                {getDensityIcon(mode)}
+              </Button>
+            ))}
+          </div>
+        </div>
+        
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search symbols..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-8"
           />
         </div>
         
-        <div className="flex flex-wrap gap-2">
+        {/* Compact Filter Pills */}
+        <div className="flex flex-wrap gap-1">
           <Badge
             variant={selectedKind === null ? "default" : "outline"}
-            className="cursor-pointer"
+            className="cursor-pointer text-xs h-6"
             onClick={() => setSelectedKind(null)}
           >
             All ({symbols.length})
           </Badge>
-          {symbolKinds.map(kind => (
+          {symbolKinds.slice(0, 3).map(kind => (
             <Badge
               key={kind}
               variant={selectedKind === kind ? "default" : "outline"}
-              className="cursor-pointer"
+              className="cursor-pointer text-xs h-6"
               onClick={() => setSelectedKind(selectedKind === kind ? null : kind)}
             >
               {formatKind(kind as Symbol['kind'])} ({symbols.filter(s => s.kind === kind).length})
             </Badge>
           ))}
-        </div>
-      </div>
-
-      {/* Symbol List */}
-      <div className="flex-1 overflow-auto px-4 pb-4">
-        <div className="space-y-2">
-          {filteredSymbols.map((symbol, index) => (
-            <Card 
-              key={`${symbol.location.path}-${symbol.identifier}-${symbol.location.line}-${index}`}
-              className={`transition-all hover:shadow-md ${
-                selectedSymbol === symbol ? 'ring-2 ring-blue-500 bg-blue-50' : ''
-              }`}
-            >
-              <CardContent className="p-3">
-                <div className="flex items-start gap-3">
-                  <div className={`p-1 rounded ${getSymbolColor(symbol.kind)}`}>
-                    {getSymbolIcon(symbol.kind)}
-                  </div>
-                  <div 
-                    className="flex-1 min-w-0 cursor-pointer"
-                    onClick={() => setSelectedSymbol(symbol)}
+          {symbolKinds.length > 3 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 px-2">
+                  <MoreHorizontal className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {symbolKinds.slice(3).map(kind => (
+                  <DropdownMenuItem
+                    key={kind}
+                    onClick={() => setSelectedKind(selectedKind === kind ? null : kind)}
                   >
-                    <div className="font-medium text-sm truncate">
-                      {symbol.identifier}
-                    </div>
-                    <div className="text-xs text-gray-500 truncate">
-                      {symbol.location.path.split('/').pop()}:{symbol.location.line}
-                    </div>
-                    <Badge variant="secondary" className="mt-1 text-xs">
-                      {formatKind(symbol.kind)}
-                    </Badge>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedSymbol(symbol);
-                      }}
-                      className={`text-gray-500 hover:text-blue-600 p-1 h-auto ${
-                        selectedSymbol === symbol ? 'text-blue-600 bg-blue-50' : ''
-                      }`}
-                      title="Show Context"
-                    >
-                      <Zap className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setViewingSymbol(symbol);
-                      }}
-                      className="text-gray-500 hover:text-blue-600 p-1 h-auto"
-                      title="Go to Definition"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          
-          {filteredSymbols.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No symbols found</p>
-              {searchTerm && (
-                <p className="text-sm">Try adjusting your search term</p>
-              )}
-            </div>
+                    {formatKind(kind as Symbol['kind'])} ({symbols.filter(s => s.kind === kind).length})
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>
 
-      {/* Context Panel */}
-      {selectedSymbol && (
+      {/* Symbol List */}
+      <div className="flex-1 overflow-auto">
+        {filteredSymbols.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No symbols found</p>
+            {searchTerm && (
+              <p className="text-xs">Try adjusting your search term</p>
+            )}
+          </div>
+        ) : (
+          <div className={densityMode === 'detailed' ? 'p-2' : ''}>
+            {filteredSymbols.map((symbol, index) => renderSymbolItem(symbol, index))}
+          </div>
+        )}
+      </div>
+
+      {/* Inline Context (only when enabled and symbol selected) */}
+      {showContextInline && selectedSymbol && (
+        <div className="border-t border-gray-200 max-h-48 overflow-y-auto">
+          <div className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-gray-600">
+                Context for {selectedSymbol.identifier}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowContextInline(false)}
+                className="h-5 w-5 p-0"
+              >
+                ×
+              </Button>
+            </div>
+            <ContextPanel 
+              symbol={selectedSymbol} 
+              onFileClick={(filePath) => {
+                console.log('File clicked:', filePath);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Context Panel (traditional bottom panel when not inline) */}
+      {selectedSymbol && !showContextInline && (
         <div className="border-t border-gray-200">
           <ContextPanel 
             symbol={selectedSymbol} 
             onFileClick={(filePath) => {
-              // For now, we'll just log the file click
-              // In a full implementation, this would open the file
               console.log('File clicked:', filePath);
             }}
           />

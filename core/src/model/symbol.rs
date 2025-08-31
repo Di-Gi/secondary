@@ -33,6 +33,46 @@ pub struct Symbol {
     pub kind: SymbolKind,
     /// The location of the symbol definition.
     pub location: SymbolLocation,
+    /// Relationships this symbol has with other symbols and files.
+    pub relationships: Vec<SymbolRelationship>,
+}
+
+/// Represents a relationship between symbols or files.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolRelationship {
+    /// The target symbol or file identifier.
+    pub target: String,
+    /// The file path where the target is located.
+    pub target_file: PathBuf,
+    /// The type of relationship.
+    pub relationship_type: RelationshipType,
+    /// Additional metadata about the relationship.
+    pub metadata: Option<String>,
+}
+
+/// Types of relationships between symbols.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RelationshipType {
+    /// This symbol imports the target.
+    Imports,
+    /// This symbol is imported by the target.
+    ImportedBy,
+    /// This symbol calls/uses the target.
+    Uses,
+    /// This symbol is used by the target.
+    UsedBy,
+    /// This symbol extends the target (inheritance).
+    Extends,
+    /// This symbol implements the target (interface/trait).
+    Implements,
+    /// This symbol is tested by the target.
+    TestedBy,
+    /// This symbol tests the target.
+    Tests,
+    /// This symbol is configured by the target.
+    ConfiguredBy,
+    /// This symbol configures the target.
+    Configures,
 }
 
 /// Defines the precise location of a symbol's definition.

@@ -9,6 +9,7 @@ import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { CodeViewer } from './CodeViewer';
+import { ContextPanel } from './ContextPanel';
 import { 
   Search, 
   FileText, 
@@ -21,7 +22,8 @@ import {
   Component, 
   FunctionSquare, 
   TerminalSquare,
-  Eye
+  Eye,
+  Zap
 } from 'lucide-react';
 
 interface SymbolExplorerProps {
@@ -176,18 +178,34 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
                       {formatKind(symbol.kind)}
                     </Badge>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setViewingSymbol(symbol);
-                    }}
-                    className="text-gray-500 hover:text-blue-600 p-1 h-auto"
-                    title="Go to Definition"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSymbol(symbol);
+                      }}
+                      className={`text-gray-500 hover:text-blue-600 p-1 h-auto ${
+                        selectedSymbol === symbol ? 'text-blue-600 bg-blue-50' : ''
+                      }`}
+                      title="Show Context"
+                    >
+                      <Zap className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewingSymbol(symbol);
+                      }}
+                      className="text-gray-500 hover:text-blue-600 p-1 h-auto"
+                      title="Go to Definition"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -205,25 +223,17 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
         </div>
       </div>
 
-      {/* Selected Symbol Details */}
+      {/* Context Panel */}
       {selectedSymbol && (
-        <div className="border-t border-gray-200 p-4 bg-gray-50">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className={`p-1 rounded ${getSymbolColor(selectedSymbol.kind)}`}>
-                {getSymbolIcon(selectedSymbol.kind)}
-              </div>
-              <span className="font-medium text-sm">{selectedSymbol.identifier}</span>
-            </div>
-            <div className="text-xs text-gray-600 space-y-1">
-              <div>Type: {formatKind(selectedSymbol.kind)}</div>
-              <div>File: {selectedSymbol.location.path.split('/').pop()}</div>
-              <div>Line: {selectedSymbol.location.line}, Column: {selectedSymbol.location.column}</div>
-              <div className="truncate" title={selectedSymbol.location.path}>
-                Path: {selectedSymbol.location.path}
-              </div>
-            </div>
-          </div>
+        <div className="border-t border-gray-200">
+          <ContextPanel 
+            symbol={selectedSymbol} 
+            onFileClick={(filePath) => {
+              // For now, we'll just log the file click
+              // In a full implementation, this would open the file
+              console.log('File clicked:', filePath);
+            }}
+          />
         </div>
       )}
 

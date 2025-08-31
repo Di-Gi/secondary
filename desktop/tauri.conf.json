@@ -42,16 +42,9 @@
       }
     },
     "bundle": {
-      "active": true,
+      "active": false,
       "targets": "all",
-      "identifier": "com.secondarymind.desktop",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ]
+      "identifier": "com.secondarymind.desktop"
     },
     "security": {
       "csp": null

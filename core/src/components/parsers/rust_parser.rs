@@ -86,6 +86,7 @@ impl<'ast> Visit<'ast> for SymbolVisitor {
                 line: span.start().line,
                 column: span.start().column,
             },
+            relationships: Vec::new(), // Will be populated by context collector
         });
 
         // Continue visiting nested items

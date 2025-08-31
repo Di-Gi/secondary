@@ -9,9 +9,10 @@ use secondary_mind_core::{
         code_source_controller::CodeSourceController,
         project_configuration_service::ProjectConfigurationService,
         home_directory_manager::HomeDirectoryManager,
+        context_collector::ContextCollector,
     },
     model::{project::Project, symbol::Symbol}, // Direct import from core
-    ProjectConfig, RecentProjects,
+    ProjectConfig, RecentProjects, ContextPackage,
 };
 use crate::AppState;
 use std::collections::HashSet;
@@ -267,22 +268,43 @@ pub async fn delete_project_note(
 }
 
 #[tauri::command]
+pub async fn collect_symbol_context(
+    symbol_identifier: String,
+    state: State<'_, AppState>,
+) -> Result<ContextPackage, String> {
+    let (symbols, project_root) = {
+        let project_guard = state.current_project.lock().unwrap();
+        let project = project_guard.as_ref().ok_or("No project currently loaded")?;
+        (project.symbolic_map.clone(), project.root.clone())
+    };
+    
+    let mut context_collector = ContextCollector::new(symbols);
+    
+    context_collector
+        .collect_context(&symbol_identifier, &project_root)
+        .map_err(|e| format!("Failed to collect context: {}", e))
+}
+
+#[tauri::command]
 pub async fn read_file_content(
     file_path: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let project_guard = state.current_project.lock().unwrap();
-    let project = project_guard.as_ref().ok_or("No project currently loaded")?;
+    let project_root = {
+        let project_guard = state.current_project.lock().unwrap();
+        let project = project_guard.as_ref().ok_or("No project currently loaded")?;
+        project.root.clone()
+    };
     
     // Resolve relative path against project root
     let full_path = if std::path::Path::new(&file_path).is_absolute() {
         PathBuf::from(&file_path)
     } else {
-        project.root.join(&file_path)
+        project_root.join(&file_path)
     };
     
     // Security check: ensure file is within project directory
-    if !full_path.starts_with(&project.root) {
+    if !full_path.starts_with(&project_root) {
         return Err("File access denied: outside project directory".to_string());
     }
     

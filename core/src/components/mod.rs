@@ -8,6 +8,7 @@ pub mod command_bus;
 pub mod ai_synthesis_core;
 pub mod home_directory_manager;
 pub mod project_configuration_service;
+pub mod context_collector; // New module for context collection
 pub mod parsers; // New module for language-specific parsers
 
 // Integration: [The `parsers` module is used by the `CodebaseCartographer`.]

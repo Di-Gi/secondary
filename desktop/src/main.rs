@@ -34,7 +34,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::save_project_note,
             commands::load_project_notes,
             commands::delete_project_note,
-            commands::read_file_content
+            commands::read_file_content,
+            commands::collect_symbol_context
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]

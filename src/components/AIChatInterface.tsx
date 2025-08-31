@@ -5,24 +5,27 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
+import { api } from '../api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Zap } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  contextUsed?: string[]; // Symbols that were used for context
 }
 
 export function AIChatInterface() {
-  const { synthesizeGuidance } = useAppStore();
+  const { synthesizeGuidance, currentProject } = useAppStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [collectingContext, setCollectingContext] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -33,22 +36,99 @@ export function AIChatInterface() {
     scrollToBottom();
   }, [messages]);
 
+  // Extract symbol mentions from user input
+  const extractSymbolMentions = (text: string): string[] => {
+    if (!currentProject) return [];
+    
+    const mentions: string[] = [];
+    const words = text.split(/\s+/);
+    
+    for (const word of words) {
+      // Clean the word of punctuation
+      const cleanWord = word.replace(/[^\w]/g, '');
+      
+      // Check if this word matches any symbol identifier
+      const matchingSymbol = currentProject.symbols.find(
+        symbol => symbol.identifier.toLowerCase() === cleanWord.toLowerCase()
+      );
+      
+      if (matchingSymbol && !mentions.includes(matchingSymbol.identifier)) {
+        mentions.push(matchingSymbol.identifier);
+      }
+    }
+    
+    return mentions;
+  };
+
+  // Enhance query with context for mentioned symbols
+  const enhanceQueryWithContext = async (query: string): Promise<{ enhancedQuery: string; contextSymbols: string[] }> => {
+    const mentionedSymbols = extractSymbolMentions(query);
+    
+    if (mentionedSymbols.length === 0) {
+      return { enhancedQuery: query, contextSymbols: [] };
+    }
+
+    setCollectingContext(true);
+    
+    try {
+      let contextualQuery = query + '\n\n--- CODEBASE CONTEXT ---\n';
+      
+      for (const symbolId of mentionedSymbols) {
+        try {
+          const context = await api.collectSymbolContext(symbolId);
+          
+          contextualQuery += `\n## Context for ${symbolId}:\n`;
+          contextualQuery += `Type: ${context.primary_symbol.kind}\n`;
+          contextualQuery += `Location: ${context.primary_symbol.location.path}:${context.primary_symbol.location.line}\n`;
+          
+          if (context.used_by.length > 0) {
+            contextualQuery += `\nUsed by:\n`;
+            context.used_by.slice(0, 3).forEach(file => {
+              contextualQuery += `- ${file.path.split('/').pop()}: ${file.preview.split('\n')[0]}\n`;
+            });
+          }
+          
+          if (context.dependencies.length > 0) {
+            contextualQuery += `\nDependencies:\n`;
+            context.dependencies.slice(0, 3).forEach(file => {
+              contextualQuery += `- ${file.path.split('/').pop()}: ${file.preview.split('\n')[0]}\n`;
+            });
+          }
+          
+          contextualQuery += '\n';
+        } catch (error) {
+          console.warn(`Failed to collect context for ${symbolId}:`, error);
+        }
+      }
+      
+      return { enhancedQuery: contextualQuery, contextSymbols: mentionedSymbols };
+    } finally {
+      setCollectingContext(false);
+    }
+  };
+
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading || collectingContext) return;
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputValue.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    const originalQuery = inputValue.trim();
     setInputValue('');
     setIsLoading(true);
 
     try {
-      const response = await synthesizeGuidance(userMessage.content);
+      // Enhance query with context if symbols are mentioned
+      const { enhancedQuery, contextSymbols } = await enhanceQueryWithContext(originalQuery);
+      
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        type: 'user',
+        content: originalQuery,
+        timestamp: new Date(),
+        contextUsed: contextSymbols,
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+
+      const response = await synthesizeGuidance(enhancedQuery);
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -149,6 +229,20 @@ export function AIChatInterface() {
                 <div className={`text-sm ${message.type === 'user' ? 'text-white' : 'text-gray-900'}`}>
                   {formatMessageContent(message.content)}
                 </div>
+                
+                {/* Show context indicators for user messages */}
+                {message.type === 'user' && message.contextUsed && message.contextUsed.length > 0 && (
+                  <div className="mt-2 flex items-center gap-1 flex-wrap">
+                    <Zap className="h-3 w-3 text-blue-200" />
+                    <span className="text-xs text-blue-200">Context:</span>
+                    {message.contextUsed.map((symbol) => (
+                      <Badge key={symbol} variant="secondary" className="text-xs bg-blue-500 text-white border-blue-400">
+                        {symbol}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                
                 <div className={`text-xs mt-2 ${message.type === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
                   {message.timestamp.toLocaleTimeString()}
                 </div>
@@ -164,7 +258,7 @@ export function AIChatInterface() {
         ))}
 
         {/* Loading indicator */}
-        {isLoading && (
+        {(isLoading || collectingContext) && (
           <div className="flex gap-3 justify-start">
             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
               <Bot className="h-4 w-4 text-blue-600" />
@@ -172,8 +266,17 @@ export function AIChatInterface() {
             <Card className="bg-white">
               <CardContent className="p-3">
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-gray-600">Thinking...</span>
+                  {collectingContext ? (
+                    <>
+                      <Zap className="h-4 w-4 animate-pulse text-blue-600" />
+                      <span className="text-sm text-gray-600">Collecting context...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-gray-600">Thinking...</span>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -191,15 +294,17 @@ export function AIChatInterface() {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask about your codebase..."
-            disabled={isLoading}
+            disabled={isLoading || collectingContext}
             className="flex-1"
           />
           <Button 
             onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading}
+            disabled={!inputValue.trim() || isLoading || collectingContext}
             size="sm"
           >
-            {isLoading ? (
+            {collectingContext ? (
+              <Zap className="h-4 w-4 animate-pulse" />
+            ) : isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />

@@ -10,4 +10,5 @@ pub mod model;
 pub use components::{
     home_directory_manager::HomeDirectoryManager,
     project_configuration_service::{ProjectConfig, ProjectConfigurationService, ProjectSettings, RecentProjects},
+    context_collector::{ContextCollector, ContextPackage, FileContext},
 };

@@ -4,7 +4,7 @@
 // Dependencies: [@tauri-apps/api/tauri for backend invocation.]
 import { invoke } from '@tauri-apps/api/tauri';
 
-// Enhanced type definitions to include Rust symbols
+// Enhanced type definitions to include Rust symbols and relationships
 export interface Symbol {
   identifier: string;
   kind: 
@@ -27,6 +27,24 @@ export interface Symbol {
     line: number;
     column: number;
   };
+  relationships: SymbolRelationship[];
+}
+
+export interface SymbolRelationship {
+  target: string;
+  target_file: string;
+  relationship_type: 
+    | 'Imports'
+    | 'ImportedBy'
+    | 'Uses'
+    | 'UsedBy'
+    | 'Extends'
+    | 'Implements'
+    | 'TestedBy'
+    | 'Tests'
+    | 'ConfiguredBy'
+    | 'Configures';
+  metadata?: string;
 }
 
 export interface ProjectConfig {
@@ -74,6 +92,22 @@ export interface ProjectNote {
   last_modified: string;
   tags: string[];
   is_favorited: boolean;
+}
+
+export interface ContextPackage {
+  primary_symbol: Symbol;
+  used_by: FileContext[];
+  dependencies: FileContext[];
+  related_files: FileContext[];
+  relevance_score: number;
+}
+
+export interface FileContext {
+  path: string;
+  preview: string;
+  relationship_type: SymbolRelationship['relationship_type'];
+  relevance: number;
+  reference_lines: number[];
 }
 
 // Check if we're running in Tauri environment
@@ -185,22 +219,26 @@ export const api = {
           {
             identifier: 'UserService',
             kind: 'TSClass',
-            location: { path: '/src/services/user.ts', line: 15, column: 1 }
+            location: { path: '/src/services/user.ts', line: 15, column: 1 },
+            relationships: []
           },
           {
             identifier: 'authenticateUser',
             kind: 'TSFunction',
-            location: { path: '/src/auth/auth.ts', line: 23, column: 1 }
+            location: { path: '/src/auth/auth.ts', line: 23, column: 1 },
+            relationships: []
           },
           {
             identifier: 'AppState',
             kind: 'Struct',
-            location: { path: '/src/main.rs', line: 42, column: 1 }
+            location: { path: '/src/main.rs', line: 42, column: 1 },
+            relationships: []
           },
            {
             identifier: 'run_analysis',
             kind: 'Function',
-            location: { path: '/src/analysis.rs', line: 88, column: 1 }
+            location: { path: '/src/analysis.rs', line: 88, column: 1 },
+            relationships: []
           },
         ],
         git_status: ['main', 'Up-to-date with origin/main'],
@@ -294,6 +332,56 @@ export const api = {
       }
     } else {
       console.log('🔧 Development mode: Note deletion simulated');
+    }
+  },
+
+  async collectSymbolContext(symbolIdentifier: string): Promise<ContextPackage> {
+    if (isTauri()) {
+      try {
+        return await invoke<ContextPackage>('collect_symbol_context', { symbolIdentifier });
+      } catch (error) {
+        console.error('Failed to collect symbol context:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock context');
+      await new Promise(resolve => setTimeout(resolve, 400));
+      return {
+        primary_symbol: {
+          identifier: symbolIdentifier,
+          kind: 'TSClass',
+          location: { path: '/src/services/user.ts', line: 15, column: 1 },
+          relationships: []
+        },
+        used_by: [
+          {
+            path: '/src/controllers/auth.controller.ts',
+            preview: '1: import { UserService } from "../services/user";\n15: const userService = new UserService();',
+            relationship_type: 'Uses',
+            relevance: 0.9,
+            reference_lines: [1, 15]
+          }
+        ],
+        dependencies: [
+          {
+            path: '/src/models/user.model.ts',
+            preview: '1: export interface User {\n2:   id: string;\n3:   email: string;\n4: }',
+            relationship_type: 'Imports',
+            relevance: 0.8,
+            reference_lines: []
+          }
+        ],
+        related_files: [
+          {
+            path: '/src/services/user.test.ts',
+            preview: '1: import { UserService } from "./user";\n5: describe("UserService", () => {',
+            relationship_type: 'Tests',
+            relevance: 0.7,
+            reference_lines: [1, 5]
+          }
+        ],
+        relevance_score: 1.0
+      };
     }
   },
 

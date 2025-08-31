@@ -68,6 +68,7 @@ impl Visit for SymbolVisitor {
                 line: loc.line,
                 column: loc.col_display + 1,
             },
+            relationships: Vec::new(), // Will be populated by context collector
         });
     }
 
@@ -81,6 +82,7 @@ impl Visit for SymbolVisitor {
                 line: loc.line,
                 column: loc.col_display + 1,
             },
+            relationships: Vec::new(), // Will be populated by context collector
         });
     }
 
@@ -94,6 +96,7 @@ impl Visit for SymbolVisitor {
                 line: loc.line,
                 column: loc.col_display + 1,
             },
+            relationships: Vec::new(), // Will be populated by context collector
         });
         n.visit_children_with(self);
     }

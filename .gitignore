@@ -3,3 +3,4 @@ node_modules
 target
 *.xml
 .structure.json
+dist

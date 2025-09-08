@@ -35,7 +35,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::load_project_notes,
             commands::delete_project_note,
             commands::read_file_content,
-            commands::collect_symbol_context
+            commands::collect_symbol_context,
+            commands::create_development_profile,
+            commands::load_development_profiles,
+            commands::update_development_profile,
+            commands::delete_development_profile,
+            commands::use_development_profile,
+            commands::check_profile_files_status,
+            commands::export_profile_context
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]

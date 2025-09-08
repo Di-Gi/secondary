@@ -1,15 +1,17 @@
 // [[SECONDARY_MIND_DESKTOP]]/src/components/ProjectWorkspace.tsx
-// Purpose: Main workspace interface displayed when a project is loaded, containing symbol explorer and AI chat.
-// Architecture: Layout component that orchestrates the symbol explorer, AI chat, and project information display.
-// Dependencies: React hooks, app store, UI components, workspace sub-components.
+// Purpose: Main workspace interface with integrated profile management, symbol explorer, and AI chat.
+// Architecture: Layout component that orchestrates profiles, symbol explorer, AI chat, and project information display.
+// Dependencies: React hooks, app store, profile components, UI components, workspace sub-components.
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
 import { Button } from './ui/button';
 import { SymbolExplorer } from './SymbolExplorer';
 import { AIChatInterface } from './AIChatInterface';
 import { NotesInterface } from './NotesInterface';
 import { GitStatusDisplay } from './GitStatusDisplay';
+
+import { ProfileSelector } from './ProfileSelector';
 import { ArrowLeft, FolderOpen, Code, Bot, BookMarked, ChevronLeft, ChevronRight, Maximize2, Minimize2, Settings } from 'lucide-react';
 
 type SidebarSize = 'collapsed' | 'narrow' | 'normal' | 'wide';
@@ -165,6 +167,13 @@ export function ProjectWorkspace() {
           </div>
         </div>
 
+        {/* Profile Selector */}
+        {sidebarSize !== 'collapsed' && (
+          <div className="px-3 py-2 border-b border-gray-200">
+            <ProfileSelector />
+          </div>
+        )}
+
         {/* Git Status */}
         {sidebarSize !== 'collapsed' && gitStatus && (
           <div className="px-3 py-2 border-b border-gray-200">
@@ -196,6 +205,15 @@ export function ProjectWorkspace() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-white">
+          <div className="flex items-center gap-4">
+            <h1 className="text-lg font-semibold text-gray-900">
+              {currentProject.project_path.split('/').pop() || 'Project'}
+            </h1>
+          </div>
+        </div>
+
         {/* Tab Navigation */}
         <div className="flex border-b border-gray-200">
           <button

@@ -110,6 +110,37 @@ export interface FileContext {
   reference_lines: number[];
 }
 
+export interface DevelopmentProfile {
+  id: string;
+  name: string;
+  description?: string;
+  tags: string[];
+  files: string[];
+  created_at: string;
+  last_used: string;
+  usage_count: number;
+}
+
+export interface ProfileExport {
+  profile: {
+    name: string;
+    description?: string;
+    tags: string[];
+    exported_at: string;
+  };
+  files: {
+    path: string;
+    content: string;
+    status: 'found' | 'missing' | 'error';
+  }[];
+}
+
+export interface FileStatus {
+  path: string;
+  exists: boolean;
+  last_modified?: string;
+}
+
 // Check if we're running in Tauri environment
 const isTauri = () => {
   try {
@@ -171,6 +202,8 @@ const MOCK_PROJECT_NOTES: ProjectNote[] = [
     is_favorited: true,
   },
 ];
+
+const MOCK_PROFILES: DevelopmentProfile[] = [];
 
 // Enhanced API functions
 export const api = {
@@ -407,6 +440,209 @@ export class UserService {
     return { success: true };
   }
 }`;
+    }
+  },
+
+  // Profile Management API
+  async createDevelopmentProfile(
+    name: string,
+    description: string | undefined,
+    tags: string[],
+    files: string[],
+    projectPath: string
+  ): Promise<DevelopmentProfile> {
+    if (isTauri()) {
+      try {
+        return await invoke<DevelopmentProfile>('create_development_profile', {
+          name,
+          description,
+          tags,
+          files,
+          projectPath,
+        });
+      } catch (error) {
+        console.error('Failed to create profile:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Profile creation simulated');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const newProfile: DevelopmentProfile = {
+        id: `profile_${Date.now()}`,
+        name,
+        description,
+        tags,
+        files,
+        created_at: new Date().toISOString(),
+        last_used: new Date().toISOString(),
+        usage_count: 0,
+      };
+      return newProfile;
+    }
+  },
+
+  async loadDevelopmentProfiles(projectPath: string): Promise<DevelopmentProfile[]> {
+    if (isTauri()) {
+      try {
+        return await invoke<DevelopmentProfile[]>('load_development_profiles', { projectPath });
+      } catch (error) {
+        console.error('Failed to load profiles:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Using mock profiles');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return MOCK_PROFILES;
+    }
+  },
+
+  async updateDevelopmentProfile(
+    profileId: string,
+    updates: {
+      name?: string;
+      description?: string;
+      tags?: string[];
+      files?: string[];
+    },
+    projectPath: string
+  ): Promise<DevelopmentProfile> {
+    if (isTauri()) {
+      try {
+        return await invoke<DevelopmentProfile>('update_development_profile', {
+          profileId,
+          name: updates.name,
+          description: updates.description,
+          tags: updates.tags,
+          files: updates.files,
+          projectPath,
+        });
+      } catch (error) {
+        console.error('Failed to update profile:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Profile update simulated');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const mockProfile = MOCK_PROFILES.find(p => p.id === profileId);
+      if (!mockProfile) throw new Error('Profile not found');
+      return { ...mockProfile, ...updates, last_used: new Date().toISOString() };
+    }
+  },
+
+  async deleteDevelopmentProfile(profileId: string, projectPath: string): Promise<void> {
+    if (isTauri()) {
+      try {
+        await invoke('delete_development_profile', { profileId, projectPath });
+      } catch (error) {
+        console.error('Failed to delete profile:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Profile deletion simulated');
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  },
+
+  async useDevelopmentProfile(profileId: string, projectPath: string): Promise<DevelopmentProfile> {
+    if (isTauri()) {
+      try {
+        return await invoke<DevelopmentProfile>('use_development_profile', { profileId, projectPath });
+      } catch (error) {
+        console.error('Failed to use profile:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Profile usage simulated');
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const mockProfile = MOCK_PROFILES.find(p => p.id === profileId);
+      if (!mockProfile) throw new Error('Profile not found');
+      return { ...mockProfile, last_used: new Date().toISOString(), usage_count: mockProfile.usage_count + 1 };
+    }
+  },
+
+  async checkProfileFilesStatus(files: string[], projectPath: string): Promise<FileStatus[]> {
+    if (isTauri()) {
+      try {
+        return await invoke<FileStatus[]>('check_profile_files_status', { files, projectPath });
+      } catch (error) {
+        console.error('Failed to check file status:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: File status check simulated');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return files.map(file => ({
+        path: file,
+        exists: Math.random() > 0.1, // 90% exist
+        last_modified: new Date(Date.now() - Math.random() * 86400000 * 7).toISOString(),
+      }));
+    }
+  },
+
+  async exportProfileContext(
+    profileId: string,
+    projectPath: string,
+    format: 'json' | 'yaml' | 'xml' = 'json'
+  ): Promise<string> {
+    if (isTauri()) {
+      try {
+        return await invoke<string>('export_profile_context', { profileId, projectPath, format });
+      } catch (error) {
+        console.error('Failed to export profile:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔧 Development mode: Profile export simulated');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const mockProfile = MOCK_PROFILES.find(p => p.id === profileId);
+      if (!mockProfile) throw new Error('Profile not found');
+      
+      const mockExport = {
+        profile: {
+          name: mockProfile.name,
+          description: mockProfile.description,
+          tags: mockProfile.tags,
+          exported_at: new Date().toISOString(),
+        },
+        files: mockProfile.files.map(file => ({
+          path: file,
+          content: `// Mock content for ${file}\nexport const mockData = 'example';`,
+          status: 'found' as const,
+        })),
+      };
+      
+      switch (format) {
+        case 'yaml':
+          return `profile:
+  name: "${mockExport.profile.name}"
+  description: "${mockExport.profile.description || ''}"
+  tags: [${mockExport.profile.tags.map(t => `"${t}"`).join(', ')}]
+  exported_at: "${mockExport.profile.exported_at}"
+files:
+${mockExport.files.map(f => `  - path: "${f.path}"
+    status: "${f.status}"
+    content: |
+      ${f.content.split('\n').join('\n      ')}`).join('\n')}`;
+        case 'xml':
+          return `<?xml version="1.0" encoding="UTF-8"?>
+<profile_export>
+  <profile>
+    <name>${mockExport.profile.name}</name>
+    <description>${mockExport.profile.description || ''}</description>
+    <tags>${mockExport.profile.tags.map(t => `<tag>${t}</tag>`).join('')}</tags>
+    <exported_at>${mockExport.profile.exported_at}</exported_at>
+  </profile>
+  <files>
+${mockExport.files.map(f => `    <file>
+      <path>${f.path}</path>
+      <status>${f.status}</status>
+      <content><![CDATA[${f.content}]]></content>
+    </file>`).join('\n')}
+  </files>
+</profile_export>`;
+        default:
+          return JSON.stringify(mockExport, null, 2);
+      }
     }
   },
 };

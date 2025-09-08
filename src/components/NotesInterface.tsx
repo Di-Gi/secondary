@@ -56,7 +56,7 @@ export function NotesInterface() {
   // Refs
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const saveTimeoutRef = useRef<number>();
 
   // Load notes when project changes
   useEffect(() => {

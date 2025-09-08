@@ -4,7 +4,7 @@
 // Dependencies: Enhanced API layer, new type definitions, existing Zustand patterns.
 
 import { create } from 'zustand';
-import { api, AnalysisResult, GitStatus, RecentProjects, ProjectNote, isDevelopmentMode } from '../api';
+import { api, AnalysisResult, GitStatus, RecentProjects, ProjectNote, DevelopmentProfile, isDevelopmentMode } from '../api';
 
 interface AppState {
   // Current project state
@@ -17,6 +17,11 @@ interface AppState {
   // Notes state
   projectNotes: ProjectNote[];
   isNotesLoading: boolean;
+  
+  // Profile state
+  developmentProfiles: DevelopmentProfile[];
+  activeProfile: DevelopmentProfile | null;
+  isProfilesLoading: boolean;
   
   // UI state
   isLoading: boolean;
@@ -36,6 +41,15 @@ interface AppState {
   saveNote: (note: ProjectNote) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
   updateNote: (noteId: string, updates: Partial<ProjectNote>) => void;
+  
+  // Profile actions
+  loadProfiles: (projectPath: string) => Promise<void>;
+  createProfile: (name: string, description: string | undefined, tags: string[], files: string[]) => Promise<void>;
+  updateProfile: (profileId: string, updates: Partial<DevelopmentProfile>) => Promise<void>;
+  deleteProfile: (profileId: string) => Promise<void>;
+  useProfile: (profileId: string) => Promise<void>;
+  clearActiveProfile: () => void;
+  exportProfile: (profileId: string, format: 'json' | 'yaml' | 'xml') => Promise<string>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -45,6 +59,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   recentProjects: null,
   projectNotes: [],
   isNotesLoading: false,
+  developmentProfiles: [],
+  activeProfile: null,
+  isProfilesLoading: false,
   isLoading: false,
   error: null,
 
@@ -88,8 +105,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         error: null,
       });
 
-      // Load project notes
+      // Load project notes and profiles
       await get().loadProjectNotes(projectPath);
+      await get().loadProfiles(projectPath);
       
       // Refresh recent projects to update last accessed time
       await get().loadRecentProjects();
@@ -137,6 +155,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentProject: null,
       gitStatus: null,
       projectNotes: [],
+      developmentProfiles: [],
+      activeProfile: null,
       error: null,
     });
   },
@@ -210,6 +230,121 @@ export const useAppStore = create<AppState>((set, get) => ({
           : note
       )
     }));
+  },
+
+  // Load development profiles for current project
+  loadProfiles: async (projectPath: string) => {
+    set({ isProfilesLoading: true });
+    try {
+      const profiles = await api.loadDevelopmentProfiles(projectPath);
+      set({ developmentProfiles: profiles, isProfilesLoading: false });
+    } catch (error) {
+      console.error('Failed to load profiles:', error);
+      set({ developmentProfiles: [], isProfilesLoading: false });
+    }
+  },
+
+  // Create a new development profile
+  createProfile: async (name: string, description: string | undefined, tags: string[], files: string[]) => {
+    const { currentProject } = get();
+    if (!currentProject) {
+      throw new Error('No project loaded');
+    }
+
+    try {
+      const profile = await api.createDevelopmentProfile(name, description, tags, files, currentProject.project_path);
+      
+      set(state => ({
+        developmentProfiles: [profile, ...state.developmentProfiles]
+      }));
+    } catch (error) {
+      console.error('Failed to create profile:', error);
+      throw error;
+    }
+  },
+
+  // Update an existing profile
+  updateProfile: async (profileId: string, updates: Partial<DevelopmentProfile>) => {
+    const { currentProject } = get();
+    if (!currentProject) {
+      throw new Error('No project loaded');
+    }
+
+    try {
+      const updatedProfile = await api.updateDevelopmentProfile(profileId, updates, currentProject.project_path);
+      
+      set(state => ({
+        developmentProfiles: state.developmentProfiles.map(p => 
+          p.id === profileId ? updatedProfile : p
+        ),
+        activeProfile: state.activeProfile?.id === profileId ? updatedProfile : state.activeProfile
+      }));
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      throw error;
+    }
+  },
+
+  // Delete a profile
+  deleteProfile: async (profileId: string) => {
+    const { currentProject } = get();
+    if (!currentProject) {
+      throw new Error('No project loaded');
+    }
+
+    try {
+      await api.deleteDevelopmentProfile(profileId, currentProject.project_path);
+      
+      set(state => ({
+        developmentProfiles: state.developmentProfiles.filter(p => p.id !== profileId),
+        activeProfile: state.activeProfile?.id === profileId ? null : state.activeProfile
+      }));
+    } catch (error) {
+      console.error('Failed to delete profile:', error);
+      throw error;
+    }
+  },
+
+  // Use/activate a profile
+  useProfile: async (profileId: string) => {
+    const { currentProject } = get();
+    if (!currentProject) {
+      throw new Error('No project loaded');
+    }
+
+    try {
+      const profile = await api.useDevelopmentProfile(profileId, currentProject.project_path);
+      
+      set(state => ({
+        activeProfile: profile,
+        developmentProfiles: state.developmentProfiles.map(p => 
+          p.id === profileId ? profile : p
+        )
+      }));
+    } catch (error) {
+      console.error('Failed to use profile:', error);
+      throw error;
+    }
+  },
+
+  // Clear active profile
+  clearActiveProfile: () => {
+    set({ activeProfile: null });
+  },
+
+  // Export profile context
+  exportProfile: async (profileId: string, format: 'json' | 'yaml' | 'xml' = 'json') => {
+    const { currentProject } = get();
+    if (!currentProject) {
+      throw new Error('No project loaded');
+    }
+
+    try {
+      return await api.exportProfileContext(profileId, currentProject.project_path, format);
+    } catch (error) {
+      console.error('Failed to export profile:', error);
+      throw error;
+    }
   },
 }));
 

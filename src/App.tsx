@@ -1,7 +1,7 @@
 // [[SECONDARY_MIND_DESKTOP]]/src/App.tsx
-// Purpose: Enhanced main React application component with persistent project management initialization.
-// Architecture: Updated to initialize the persistent storage system and handle app-level state properly.
-// Dependencies: Enhanced app store with persistence, existing UI components, improved error handling.
+// Purpose: Main React application component with integrated profile management system.
+// Architecture: Clean single-view application that shows either project dashboard or workspace with integrated profiles.
+// Dependencies: Enhanced app store with profile management, UI components, error handling.
 
 import { useEffect } from 'react';
 import { useAppStore } from './store/appStore';
@@ -59,5 +59,5 @@ function App() {
 
 export default App;
 
-// Integration: Enhanced root component that properly initializes the persistent storage system and provides improved loading states.
-// Notes: Includes proper error boundaries and loading states for a polished user experience with the enhanced persistence features.
+// Integration: Clean root component with integrated profile management - no more demo split view.
+// Notes: Profiles are now fully integrated into the main workspace interface for seamless development workflow.

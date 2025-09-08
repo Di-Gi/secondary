@@ -4,11 +4,13 @@
 // Dependencies: React, Symbol type from api.ts, lucide-react for icons, UI components, dropdown menu
 import { useState, useMemo } from 'react';
 import { Symbol } from '../api';
+import { useAppStore } from '../store/appStore';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { CodeViewer } from './CodeViewer';
 import { ContextPanel } from './ContextPanel';
+import { ProfileCreationDialog } from './ProfileCreationDialog';
 import { 
   Search, 
   FileText, 
@@ -28,7 +30,8 @@ import {
   List,
   Rows3,
   Copy,
-  ExternalLink
+  ExternalLink,
+  FolderPlus
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -45,9 +48,11 @@ interface SymbolExplorerProps {
 }
 
 export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
+  const { } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<Symbol | null>(null);
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [viewingSymbol, setViewingSymbol] = useState<Symbol | null>(null);
   const [densityMode, setDensityMode] = useState<DensityMode>('comfortable');
   const [showContextInline, setShowContextInline] = useState(false);
@@ -352,6 +357,16 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-sm">Symbols</h3>
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsProfileDialogOpen(true)}
+              className="h-7 px-2"
+              title="Create profile from files"
+            >
+              <FolderPlus className="h-3 w-3 mr-1" />
+              <span className="text-xs">Profile</span>
+            </Button>
             {(['compact', 'comfortable', 'detailed'] as DensityMode[]).map((mode) => (
               <Button
                 key={mode}
@@ -485,8 +500,16 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
           </div>
         </div>
       )}
+
+      {/* Profile Creation Dialog */}
+      <ProfileCreationDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+      />
     </div>
   );
+
+
 }
 // Integration: [This component is a key part of the `ProjectWorkspace`. Its updates are crucial for visualizing the results of the new polyglot backend.]
 // Notes: [New icons from `lucide-react` have been chosen to represent Rust constructs. The helper functions are now strongly typed with `Symbol['kind']` for better safety and intellisense.]

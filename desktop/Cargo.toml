@@ -27,6 +27,7 @@ env_logger = { workspace = true } # Optional
 dotenvy = { workspace = true } # Optional
 chrono = "0.4.41"
 serde_json.workspace = true
+serde_yaml = "0.9"
 
 [[bin]]
 name = "secondary-mind-desktop"

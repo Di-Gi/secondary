@@ -16,7 +16,7 @@ use secondary_mind_core::{
 };
 use crate::AppState;
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::State;
 use tokio::fs;
 use serde::{Serialize, Deserialize};
@@ -44,6 +44,46 @@ pub struct ProjectNote {
     pub last_modified: chrono::DateTime<chrono::Utc>,
     pub tags: Vec<String>,
     pub is_favorited: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DevelopmentProfile {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+    pub files: Vec<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub last_used: chrono::DateTime<chrono::Utc>,
+    pub usage_count: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProfileExport {
+    pub profile: ProfileMetadata,
+    pub files: Vec<ProfileFileContent>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProfileMetadata {
+    pub name: String,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+    pub exported_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProfileFileContent {
+    pub path: String,
+    pub content: String,
+    pub status: String, // "found", "missing", "error"
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FileStatus {
+    pub path: String,
+    pub exists: bool,
+    pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 #[tauri::command]
@@ -93,6 +133,28 @@ pub async fn analyze_project(
     })
 }
 
+// Helper function to clean Windows path prefixes and make paths relative
+fn clean_file_path(path: &Path, project_root: &Path) -> String {
+    // First, try to make the path relative to the project root
+    if let Ok(relative_path) = path.strip_prefix(project_root) {
+        // Convert to forward slashes for consistency
+        relative_path.to_string_lossy().replace('\\', "/")
+    } else {
+        // If we can't make it relative, clean the absolute path
+        let path_str = path.to_string_lossy();
+        
+        // Remove Windows UNC prefix if present
+        let cleaned = if path_str.starts_with(r"\\?\") {
+            &path_str[4..]
+        } else {
+            &path_str
+        };
+        
+        // Convert backslashes to forward slashes
+        cleaned.replace('\\', "/")
+    }
+}
+
 // Helper function to scan project for symbols
 fn scan_project_for_symbols(root: &std::path::Path, cartographer: &CodebaseCartographer) -> Vec<Symbol> {
     let mut symbols = Vec::new();
@@ -104,8 +166,12 @@ fn scan_project_for_symbols(root: &std::path::Path, cartographer: &CodebaseCarto
         let path = entry.path();
         if path.is_file() {
             // The cartographer now handles the logic of which files to parse
-            if let Ok(file_symbols) = cartographer.parse_file(path) {
+            if let Ok(mut file_symbols) = cartographer.parse_file(path) {
                 if !file_symbols.is_empty() {
+                    // Clean the file paths in symbols to be relative to project root
+                    for symbol in &mut file_symbols {
+                        symbol.location.path = PathBuf::from(clean_file_path(path, root));
+                    }
                     symbols.extend(file_symbols);
                 }
             }
@@ -312,5 +378,290 @@ pub async fn read_file_content(
         format!("Failed to read file {}: {}", full_path.display(), e)
     })
 }
+
+// Profile Management Commands
+
+#[tauri::command]
+pub async fn create_development_profile(
+    name: String,
+    description: Option<String>,
+    tags: Vec<String>,
+    files: Vec<String>,
+    project_path: String,
+) -> Result<DevelopmentProfile, String> {
+    let project_root = PathBuf::from(&project_path);
+    let profiles_dir = project_root.join(".secondary-mind").join("profiles");
+    
+    tokio::fs::create_dir_all(&profiles_dir).await.map_err(|e| {
+        format!("Failed to create profiles directory: {}", e)
+    })?;
+    
+    let profile = DevelopmentProfile {
+        id: format!("profile_{}", chrono::Utc::now().timestamp_millis()),
+        name,
+        description,
+        tags,
+        files,
+        created_at: chrono::Utc::now(),
+        last_used: chrono::Utc::now(),
+        usage_count: 0,
+    };
+    
+    let profile_file = profiles_dir.join(format!("{}.json", profile.id));
+    let profile_json = serde_json::to_string_pretty(&profile).map_err(|e| {
+        format!("Failed to serialize profile: {}", e)
+    })?;
+    
+    tokio::fs::write(&profile_file, profile_json).await.map_err(|e| {
+        format!("Failed to save profile: {}", e)
+    })?;
+    
+    Ok(profile)
+}
+
+#[tauri::command]
+pub async fn load_development_profiles(project_path: String) -> Result<Vec<DevelopmentProfile>, String> {
+    let project_root = PathBuf::from(&project_path);
+    let profiles_dir = project_root.join(".secondary-mind").join("profiles");
+    
+    if !profiles_dir.exists() {
+        return Ok(Vec::new());
+    }
+    
+    let mut profiles = Vec::new();
+    let mut entries = tokio::fs::read_dir(&profiles_dir).await.map_err(|e| {
+        format!("Failed to read profiles directory: {}", e)
+    })?;
+    
+    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) == Some("json") {
+            let content = tokio::fs::read_to_string(&path).await.map_err(|e| e.to_string())?;
+            if let Ok(profile) = serde_json::from_str::<DevelopmentProfile>(&content) {
+                profiles.push(profile);
+            }
+        }
+    }
+    
+    // Sort by last used, then by name
+    profiles.sort_by(|a, b| {
+        b.last_used.cmp(&a.last_used).then_with(|| a.name.cmp(&b.name))
+    });
+    
+    Ok(profiles)
+}
+
+#[tauri::command]
+pub async fn update_development_profile(
+    profile_id: String,
+    name: Option<String>,
+    description: Option<String>,
+    tags: Option<Vec<String>>,
+    files: Option<Vec<String>>,
+    project_path: String,
+) -> Result<DevelopmentProfile, String> {
+    let project_root = PathBuf::from(&project_path);
+    let profile_file = project_root.join(".secondary-mind").join("profiles").join(format!("{}.json", profile_id));
+    
+    if !profile_file.exists() {
+        return Err("Profile not found".to_string());
+    }
+    
+    let content = tokio::fs::read_to_string(&profile_file).await.map_err(|e| e.to_string())?;
+    let mut profile: DevelopmentProfile = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    
+    // Update fields if provided
+    if let Some(name) = name { profile.name = name; }
+    if let Some(description) = description { profile.description = Some(description); }
+    if let Some(tags) = tags { profile.tags = tags; }
+    if let Some(files) = files { profile.files = files; }
+    
+    profile.last_used = chrono::Utc::now();
+    
+    let profile_json = serde_json::to_string_pretty(&profile).map_err(|e| {
+        format!("Failed to serialize profile: {}", e)
+    })?;
+    
+    tokio::fs::write(&profile_file, profile_json).await.map_err(|e| {
+        format!("Failed to save profile: {}", e)
+    })?;
+    
+    Ok(profile)
+}
+
+#[tauri::command]
+pub async fn delete_development_profile(
+    profile_id: String,
+    project_path: String,
+) -> Result<(), String> {
+    let project_root = PathBuf::from(&project_path);
+    let profile_file = project_root.join(".secondary-mind").join("profiles").join(format!("{}.json", profile_id));
+    
+    if profile_file.exists() {
+        tokio::fs::remove_file(&profile_file).await.map_err(|e| e.to_string())?;
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn use_development_profile(
+    profile_id: String,
+    project_path: String,
+) -> Result<DevelopmentProfile, String> {
+    let project_root = PathBuf::from(&project_path);
+    let profile_file = project_root.join(".secondary-mind").join("profiles").join(format!("{}.json", profile_id));
+    
+    if !profile_file.exists() {
+        return Err("Profile not found".to_string());
+    }
+    
+    let content = tokio::fs::read_to_string(&profile_file).await.map_err(|e| e.to_string())?;
+    let mut profile: DevelopmentProfile = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    
+    // Update usage statistics
+    profile.last_used = chrono::Utc::now();
+    profile.usage_count += 1;
+    
+    let profile_json = serde_json::to_string_pretty(&profile).map_err(|e| {
+        format!("Failed to serialize profile: {}", e)
+    })?;
+    
+    tokio::fs::write(&profile_file, profile_json).await.map_err(|e| {
+        format!("Failed to save profile: {}", e)
+    })?;
+    
+    Ok(profile)
+}
+
+#[tauri::command]
+pub async fn check_profile_files_status(
+    files: Vec<String>,
+    project_path: String,
+) -> Result<Vec<FileStatus>, String> {
+    let project_root = PathBuf::from(&project_path);
+    let mut statuses = Vec::new();
+    
+    for file_path in files {
+        // Clean the file path and make it relative to project root
+        let cleaned_path = clean_file_path(&PathBuf::from(&file_path), &project_root);
+        let full_path = project_root.join(&cleaned_path);
+        
+        let exists = full_path.exists();
+        let last_modified = if exists {
+            tokio::fs::metadata(&full_path).await
+                .ok()
+                .and_then(|meta| meta.modified().ok())
+                .map(|time| chrono::DateTime::from(time))
+        } else {
+            None
+        };
+        
+        statuses.push(FileStatus {
+            path: cleaned_path,
+            exists,
+            last_modified,
+        });
+    }
+    
+    Ok(statuses)
+}
+
+#[tauri::command]
+pub async fn export_profile_context(
+    profile_id: String,
+    project_path: String,
+    format: String, // "json", "yaml", "xml"
+) -> Result<String, String> {
+    let project_root = PathBuf::from(&project_path);
+    let profile_file = project_root.join(".secondary-mind").join("profiles").join(format!("{}.json", profile_id));
+    
+    if !profile_file.exists() {
+        return Err("Profile not found".to_string());
+    }
+    
+    let content = tokio::fs::read_to_string(&profile_file).await.map_err(|e| e.to_string())?;
+    let profile: DevelopmentProfile = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    
+    let mut file_contents = Vec::new();
+    
+    for file_path in &profile.files {
+        // Clean the file path and make it relative to project root
+        let cleaned_path = clean_file_path(&PathBuf::from(file_path), &project_root);
+        let full_path = project_root.join(&cleaned_path);
+        
+        let (content, status) = if full_path.exists() && full_path.starts_with(&project_root) {
+            match tokio::fs::read_to_string(&full_path).await {
+                Ok(content) => (content, "found"),
+                Err(_) => (String::new(), "error"),
+            }
+        } else {
+            (String::new(), "missing")
+        };
+        
+        file_contents.push(ProfileFileContent {
+            path: cleaned_path,
+            content,
+            status: status.to_string(),
+        });
+    }
+    
+    let export = ProfileExport {
+        profile: ProfileMetadata {
+            name: profile.name,
+            description: profile.description,
+            tags: profile.tags,
+            exported_at: chrono::Utc::now(),
+        },
+        files: file_contents,
+    };
+    
+    match format.as_str() {
+        "yaml" => {
+            serde_yaml::to_string(&export).map_err(|e| format!("Failed to serialize to YAML: {}", e))
+        },
+        "xml" => {
+            // Simple XML generation since we don't want to add heavy dependencies
+            let mut xml = String::new();
+            xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+            xml.push_str("<profile_export>\n");
+            xml.push_str(&format!("  <profile>\n"));
+            xml.push_str(&format!("    <name>{}</name>\n", escape_xml(&export.profile.name)));
+            if let Some(desc) = &export.profile.description {
+                xml.push_str(&format!("    <description>{}</description>\n", escape_xml(desc)));
+            }
+            xml.push_str("    <tags>\n");
+            for tag in &export.profile.tags {
+                xml.push_str(&format!("      <tag>{}</tag>\n", escape_xml(tag)));
+            }
+            xml.push_str("    </tags>\n");
+            xml.push_str(&format!("    <exported_at>{}</exported_at>\n", export.profile.exported_at.to_rfc3339()));
+            xml.push_str("  </profile>\n");
+            xml.push_str("  <files>\n");
+            for file in &export.files {
+                xml.push_str("    <file>\n");
+                xml.push_str(&format!("      <path>{}</path>\n", escape_xml(&file.path)));
+                xml.push_str(&format!("      <status>{}</status>\n", escape_xml(&file.status)));
+                xml.push_str(&format!("      <content><![CDATA[{}]]></content>\n", file.content));
+                xml.push_str("    </file>\n");
+            }
+            xml.push_str("  </files>\n");
+            xml.push_str("</profile_export>\n");
+            Ok(xml)
+        },
+        _ => {
+            serde_json::to_string_pretty(&export).map_err(|e| format!("Failed to serialize to JSON: {}", e))
+        }
+    }
+}
+
+fn escape_xml(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 // Integration: [Imports `Symbol` directly from `secondary-mind-core`, eliminating the redundant local model. The `scan_project_for_symbols` helper now correctly uses the refactored `CodebaseCartographer`.]
 // Notes: [The local `desktop/src/model` directory can now be safely deleted as it is no longer used.]

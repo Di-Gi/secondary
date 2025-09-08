@@ -14,7 +14,7 @@ use secondary_mind_core::{
     model::{project::Project, symbol::Symbol}, // Direct import from core
     ProjectConfig, RecentProjects, ContextPackage,
 };
-use crate::AppState;
+use crate::{AppState, startup::StartupManager};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tauri::State;
@@ -653,6 +653,13 @@ pub async fn export_profile_context(
             serde_json::to_string_pretty(&export).map_err(|e| format!("Failed to serialize to JSON: {}", e))
         }
     }
+}
+
+#[tauri::command]
+pub async fn frontend_ready(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let startup_manager = StartupManager::new(app_handle);
+    startup_manager.on_frontend_ready().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn escape_xml(s: &str) -> String {

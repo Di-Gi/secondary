@@ -10,6 +10,7 @@
 
 use secondary_mind_desktop::{
     commands,
+    startup::StartupManager,
     AppState,
 };
 use std::sync::Mutex;
@@ -42,13 +43,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::delete_development_profile,
             commands::use_development_profile,
             commands::check_profile_files_status,
-            commands::export_profile_context
+            commands::export_profile_context,
+            commands::frontend_ready
         ])
         .setup(|app| {
+            // Initialize startup manager and show splash screen
+            let startup_manager = StartupManager::new(app.handle());
+            if let Err(e) = startup_manager.initialize() {
+                log::error!("Failed to initialize startup sequence: {}", e);
+            }
+
             #[cfg(debug_assertions)]
             {
-                let window = app.get_window("main").unwrap();
-                window.open_devtools();
+                // In debug mode, still open devtools but on the main window when it becomes visible
+                let app_handle = app.handle();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+                    if let Some(window) = app_handle.get_window("main") {
+                        let _ = window.open_devtools();
+                    }
+                });
             }
             Ok(())
         })

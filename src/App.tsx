@@ -9,12 +9,18 @@ import { ProjectDashboard } from './components/ProjectDashboard';
 import { ProjectWorkspace } from './components/ProjectWorkspace';
 import { Toaster } from './components/ui/sonner';
 import { LoadingSpinner } from './components/ui/loading-spinner';
+import { initializeFrontend } from './init';
 
 function App() {
   const { currentProject, isLoading, error, initializeApp } = useAppStore();
 
   useEffect(() => {
-    initializeApp();
+    const initialize = async () => {
+      await initializeApp();
+      // Signal that frontend is ready after app initialization
+      await initializeFrontend();
+    };
+    initialize();
   }, [initializeApp]);
 
   if (error) {

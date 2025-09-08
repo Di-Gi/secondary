@@ -3,7 +3,7 @@
 // Architecture: Simple state machine that handles splash -> main window transition.
 // Dependencies: Tauri window management.
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, WindowBuilder, WindowUrl};
 use std::time::Duration;
 
 pub struct StartupManager {
@@ -15,17 +15,63 @@ impl StartupManager {
         Self { app_handle }
     }
 
-    /// Initialize the startup sequence - show splash, hide main window
+    /// Initialize the startup sequence - create main window and show splash
     pub fn initialize(&self) -> tauri::Result<()> {
-        // Ensure main window is hidden initially
-        if let Some(main_window) = self.app_handle.get_window("main") {
-            main_window.hide()?;
-        }
+        // Create the main window with platform-specific settings
+        self.create_main_window()?;
 
         // Show splash window
         if let Some(splash_window) = self.app_handle.get_window("splash") {
             splash_window.show()?;
             splash_window.set_focus()?;
+        }
+
+        Ok(())
+    }
+
+    /// Create the main window with platform-specific configurations
+    fn create_main_window(&self) -> tauri::Result<()> {
+        // Use conditional compilation to define the main window
+        #[cfg(target_os = "macos")]
+        {
+            let _window = WindowBuilder::new(
+                &self.app_handle,
+                "main", // The window label
+                WindowUrl::App("index.html".into()),
+            )
+            .title("Secondary Mind")
+            .inner_size(1200.0, 800.0)
+            .min_inner_size(800.0, 600.0)
+            .center()
+            .resizable(true)
+            .fullscreen(false)
+            .visible(false)
+            .decorations(true)
+            .transparent(true)
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true)
+            .build()
+            .expect("Failed to create main window on macOS");
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _window = WindowBuilder::new(
+                &self.app_handle,
+                "main", // The window label
+                WindowUrl::App("index.html".into()),
+            )
+            .title("Secondary Mind")
+            .inner_size(1200.0, 800.0)
+            .min_inner_size(800.0, 600.0)
+            .center()
+            .resizable(true)
+            .fullscreen(false)
+            .visible(false)
+            .decorations(false)
+            .transparent(false)
+            .build()
+            .expect("Failed to create main window on Windows/Linux");
         }
 
         Ok(())

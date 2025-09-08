@@ -9,6 +9,7 @@ import { ProjectDashboard } from './components/ProjectDashboard';
 import { ProjectWorkspace } from './components/ProjectWorkspace';
 import { Toaster } from './components/ui/sonner';
 import { LoadingSpinner } from './components/ui/loading-spinner';
+import { Titlebar } from './components/ui/titlebar';
 import { initializeFrontend } from './init';
 
 function App() {
@@ -25,16 +26,19 @@ function App() {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-red-600 mb-2">Error</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Reload App
-          </button>
+      <div className="flex flex-col h-screen bg-gray-50">
+        <Titlebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <h1 className="text-2xl font-bold text-red-600 mb-2">Error</h1>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Reload App
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -42,22 +46,28 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <LoadingSpinner size="xl" />
-          <p className="mt-4 text-gray-600">Initializing Secondary Mind...</p>
+      <div className="flex flex-col h-screen bg-gray-50">
+        <Titlebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <LoadingSpinner size="xl" />
+            <p className="mt-4 text-gray-600">Initializing Secondary Mind...</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-gray-50">
-      {currentProject ? (
-        <ProjectWorkspace />
-      ) : (
-        <ProjectDashboard />
-      )}
+    <div className="flex flex-col h-screen bg-gray-50">
+      <Titlebar />
+      <div className="flex-1 overflow-hidden">
+        {currentProject ? (
+          <ProjectWorkspace />
+        ) : (
+          <ProjectDashboard />
+        )}
+      </div>
       <Toaster />
     </div>
   );

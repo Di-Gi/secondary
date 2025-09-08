@@ -16,7 +16,7 @@ tauri-build = { version = "1.0", features = [] }
 secondary-mind-core = { path = "../core" }
 
 # Tauri-specific framework dependency
-tauri = { version = "1.0", features = ["protocol-asset", "dialog-open", "fs-read-file", "fs-write-file", "fs-read-dir", "fs-exists", "path-all", "shell-open"] }
+tauri = { version = "1.0", features = ["protocol-asset", "dialog-open", "fs-read-file", "fs-write-file", "fs-read-dir", "fs-exists", "path-all", "shell-open", "os-all", "window-close", "window-hide", "window-maximize", "window-minimize", "window-show", "window-start-dragging", "window-unmaximize", "window-unminimize"] }
 
 # Workspace dependencies required by the desktop binary/library itself
 tokio = { workspace = true }

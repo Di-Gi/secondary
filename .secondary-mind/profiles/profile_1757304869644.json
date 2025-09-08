@@ -1,0 +1,16 @@
+{
+  "id": "profile_1757304869644",
+  "name": "cli",
+  "description": null,
+  "tags": [
+    "rust"
+  ],
+  "files": [
+    "cli/lib.rs",
+    "cli/main.rs",
+    "cli/mod.rs"
+  ],
+  "created_at": "2025-09-08T04:14:29.644428400Z",
+  "last_used": "2025-09-08T04:24:56.357134500Z",
+  "usage_count": 5
+}

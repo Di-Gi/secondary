@@ -108,5 +108,16 @@
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Titlebar drag region styles */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+[data-tauri-drag-region] button {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 /* Integration: Imported by main.tsx to establish the global design system and styling foundation. */
 /* Notes: Includes design tokens, dark mode support, custom scrollbars, and animation utilities. */

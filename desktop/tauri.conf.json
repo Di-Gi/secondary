@@ -39,6 +39,20 @@
       "protocol": {
         "asset": true,
         "assetScope": ["**"]
+      },
+      "window": {
+        "all": false,
+        "close": true,
+        "hide": true,
+        "show": true,
+        "maximize": true,
+        "minimize": true,
+        "unmaximize": true,
+        "unminimize": true,
+        "startDragging": true
+      },
+      "os": {
+        "all": true
       }
     },
     "bundle": {
@@ -50,17 +64,6 @@
       "csp": null
     },
     "windows": [
-      {
-        "label": "main",
-        "fullscreen": false,
-        "resizable": true,
-        "title": "Secondary Mind Desktop",
-        "width": 1200,
-        "height": 800,
-        "minWidth": 800,
-        "minHeight": 600,
-        "visible": false
-      },
       {
         "label": "splash",
         "url": "../splash.html",

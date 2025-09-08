@@ -86,7 +86,7 @@ export function ProjectWorkspace() {
   }, [isResizing]);
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-full bg-white">
       {/* Adaptive Sidebar for Symbol Explorer */}
       <aside 
         className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-200 relative ${

@@ -228,7 +228,7 @@ pub async fn synthesize_guidance(
     query: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let relevant_files = {
+    let (relevant_files, project_root) = {
         let project_guard = state.current_project.lock().unwrap();
         let project = project_guard.as_ref().ok_or("No project currently loaded")?;
         
@@ -243,7 +243,7 @@ pub async fn synthesize_guidance(
                 }
             }
         }
-        files
+        (files, project.root.clone())
     };
 
     if relevant_files.is_empty() {
@@ -255,8 +255,12 @@ pub async fn synthesize_guidance(
     context.push_str(&format!("User Query: {}\n\n---\n\n", query));
     
     for file_path in relevant_files {
-        let content = fs::read_to_string(&file_path).await.map_err(|e| {
-            format!("Failed to read file {}: {}", file_path.display(), e)
+        // Normalize the file path to handle both forward and backward slashes
+        let normalized_path = file_path.to_string_lossy().replace('/', std::path::MAIN_SEPARATOR_STR);
+        let full_path = project_root.join(&normalized_path);
+        
+        let content = fs::read_to_string(&full_path).await.map_err(|e| {
+            format!("Failed to read file {}: {}", full_path.display(), e)
         })?;
         context.push_str(&format!("// File: {}\n{}\n\n", file_path.display(), content));
     }
@@ -362,11 +366,14 @@ pub async fn read_file_content(
         project.root.clone()
     };
     
+    // Normalize the file path to handle both forward and backward slashes
+    let normalized_path = file_path.replace('/', std::path::MAIN_SEPARATOR_STR);
+    
     // Resolve relative path against project root
-    let full_path = if std::path::Path::new(&file_path).is_absolute() {
-        PathBuf::from(&file_path)
+    let full_path = if std::path::Path::new(&normalized_path).is_absolute() {
+        PathBuf::from(&normalized_path)
     } else {
-        project_root.join(&file_path)
+        project_root.join(&normalized_path)
     };
     
     // Security check: ensure file is within project directory
@@ -543,9 +550,9 @@ pub async fn check_profile_files_status(
     let mut statuses = Vec::new();
     
     for file_path in files {
-        // Clean the file path and make it relative to project root
-        let cleaned_path = clean_file_path(&PathBuf::from(&file_path), &project_root);
-        let full_path = project_root.join(&cleaned_path);
+        // Normalize path separators for the current OS
+        let normalized_path = file_path.replace('/', std::path::MAIN_SEPARATOR_STR);
+        let full_path = project_root.join(&normalized_path);
         
         let exists = full_path.exists();
         let last_modified = if exists {
@@ -558,7 +565,7 @@ pub async fn check_profile_files_status(
         };
         
         statuses.push(FileStatus {
-            path: cleaned_path,
+            path: file_path,
             exists,
             last_modified,
         });
@@ -586,9 +593,9 @@ pub async fn export_profile_context(
     let mut file_contents = Vec::new();
     
     for file_path in &profile.files {
-        // Clean the file path and make it relative to project root
-        let cleaned_path = clean_file_path(&PathBuf::from(file_path), &project_root);
-        let full_path = project_root.join(&cleaned_path);
+        // Normalize path separators for the current OS
+        let normalized_path = file_path.replace('/', std::path::MAIN_SEPARATOR_STR);
+        let full_path = project_root.join(&normalized_path);
         
         let (content, status) = if full_path.exists() && full_path.starts_with(&project_root) {
             match tokio::fs::read_to_string(&full_path).await {
@@ -600,7 +607,7 @@ pub async fn export_profile_context(
         };
         
         file_contents.push(ProfileFileContent {
-            path: cleaned_path,
+            path: file_path.clone(),
             content,
             status: status.to_string(),
         });

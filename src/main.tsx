@@ -6,11 +6,18 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { ThemeProvider } from "./components/ThemeProvider";
 import "./globals.css";
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+// Performance optimization: Enable concurrent features
+const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
+
+// Wrap app with optimized theme provider
+root.render(
   <React.StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </React.StrictMode>,
 );
 

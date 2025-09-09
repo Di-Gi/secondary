@@ -1,6 +1,7 @@
 // Unified profile creation dialog that combines file selection with naming/description
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store/appStore';
+import { useTheme } from '../store/uiStore';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
@@ -48,6 +49,7 @@ export function ProfileCreationDialog({
   initialDescription = ''
 }: ProfileCreationDialogProps) {
   const { currentProject, createProfile } = useAppStore();
+  const theme = useTheme();
   
   // Form state
   const [profileName, setProfileName] = useState(initialName);
@@ -72,12 +74,17 @@ export function ProfileCreationDialog({
     }
   }, [selectedFiles, profileName]);
 
-  // Sync manual files with selected files when switching tabs
+  // Sync manual files with selected files only when switching TO manual tab (one-time sync)
+  const [hasInitializedManualTab, setHasInitializedManualTab] = useState(false);
+  
   useEffect(() => {
-    if (activeTab === 'manual') {
+    if (activeTab === 'manual' && !hasInitializedManualTab && selectedFiles.size > 0) {
       setManualFiles(Array.from(selectedFiles).join('\n'));
+      setHasInitializedManualTab(true);
+    } else if (activeTab === 'browse') {
+      setHasInitializedManualTab(false);
     }
-  }, [activeTab, selectedFiles]);
+  }, [activeTab, hasInitializedManualTab, selectedFiles.size]);
 
   // Generate file tree from project symbols
   useEffect(() => {
@@ -121,29 +128,131 @@ export function ProfileCreationDialog({
 
   const handleManualFilesChange = (value: string) => {
     setManualFiles(value);
+    // Debounce the file selection update to prevent cursor jumping
     const files = value.split('\n').map(f => f.trim()).filter(Boolean);
     setSelectedFiles(new Set(files));
   };
 
+  // Enhanced glob pattern matching
+  const matchGlob = (pattern: string, path: string): boolean => {
+    // Convert glob pattern to regex
+    const regexPattern = pattern
+      .replace(/\./g, '\\.')
+      .replace(/\*\*/g, '___DOUBLESTAR___')
+      .replace(/\*/g, '[^/]*')
+      .replace(/___DOUBLESTAR___/g, '.*')
+      .replace(/\?/g, '[^/]')
+      .replace(/\[([^\]]+)\]/g, '[$1]');
+    
+    const regex = new RegExp(`^${regexPattern}$`);
+    return regex.test(path);
+  };
+
+  // Resolve glob patterns to actual file paths
+  const resolveGlobPatterns = (patterns: string[]): { resolved: string[], globMatches: { [pattern: string]: string[] } } => {
+    if (!currentProject) return { resolved: [], globMatches: {} };
+    
+    // Get unique file paths from symbols (remove duplicates)
+    const projectFiles = [...new Set(currentProject.symbols.map(symbol => {
+      let path = symbol.location.path;
+      // Normalize path
+      path = path.startsWith('\\\\?\\') ? path.substring(4) : path;
+      path = path.replace(/\\/g, '/');
+      path = path.startsWith('/') ? path.substring(1) : path;
+      return path;
+    }))];
+
+    const resolved = new Set<string>();
+    const globMatches: { [pattern: string]: string[] } = {};
+
+    patterns.forEach(pattern => {
+      const trimmedPattern = pattern.trim();
+      if (!trimmedPattern) return;
+      
+      const normalizedPattern = trimmedPattern.replace(/\\/g, '/').replace(/^\/+/, '');
+      
+      // Check if it's a glob pattern
+      if (normalizedPattern.includes('*') || normalizedPattern.includes('?') || normalizedPattern.includes('[')) {
+        const matches = [...new Set(projectFiles.filter(file => matchGlob(normalizedPattern, file)))];
+        globMatches[pattern] = matches;
+        matches.forEach(match => resolved.add(match));
+      } else {
+        // Direct file path
+        if (projectFiles.includes(normalizedPattern)) {
+          resolved.add(normalizedPattern);
+        }
+      }
+    });
+
+    return { resolved: Array.from(resolved), globMatches };
+  };
+
+  // Enhanced validation with glob pattern resolution
+  const validateFilePaths = (paths: string[]): { 
+    validation: { [path: string]: 'valid' | 'invalid' | 'glob' }, 
+    globMatches: { [pattern: string]: string[] },
+    totalResolvedCount: number 
+  } => {
+    const validation: { [path: string]: 'valid' | 'invalid' | 'glob' } = {};
+    
+    if (!currentProject) return { validation, globMatches: {}, totalResolvedCount: 0 };
+    
+    // Get unique file paths from symbols (remove duplicates)
+    const projectFiles = new Set(currentProject.symbols.map(symbol => {
+      let path = symbol.location.path;
+      // Normalize path
+      path = path.startsWith('\\\\?\\') ? path.substring(4) : path;
+      path = path.replace(/\\/g, '/');
+      path = path.startsWith('/') ? path.substring(1) : path;
+      return path;
+    }));
+
+    const { resolved, globMatches } = resolveGlobPatterns(paths);
+
+    paths.forEach(path => {
+      const trimmedPath = path.trim();
+      if (!trimmedPath) return;
+      
+      const normalizedPath = trimmedPath.replace(/\\/g, '/').replace(/^\/+/, '');
+      
+      if (normalizedPath.includes('*') || normalizedPath.includes('?') || normalizedPath.includes('[')) {
+        const matches = globMatches[path] || [];
+        validation[path] = matches.length > 0 ? 'glob' : 'invalid';
+      } else if (projectFiles.has(normalizedPath)) {
+        validation[path] = 'valid';
+      } else {
+        validation[path] = 'invalid';
+      }
+    });
+
+    return { validation, globMatches, totalResolvedCount: resolved.length };
+  };
+
+  // Memoize validation to prevent unnecessary re-computations
+  const validationResult = useMemo(() => {
+    return validateFilePaths(manualFiles.split('\n'));
+  }, [manualFiles, currentProject]);
+
+  const { validation: currentValidation, globMatches, totalResolvedCount } = validationResult;
+
   const handleCreateProfile = async () => {
     if (!profileName.trim()) return;
 
-    let finalFiles = activeTab === 'manual' 
+    let inputPaths = activeTab === 'manual' 
       ? manualFiles.split('\n').map(f => f.trim()).filter(Boolean)
       : Array.from(selectedFiles);
 
-    if (finalFiles.length === 0) return;
+    if (inputPaths.length === 0) return;
 
-    // Clean file paths before saving
-    finalFiles = finalFiles.map(path => {
-      // Remove Windows UNC prefix if present
-      let cleaned = path.startsWith('\\\\?\\') ? path.substring(4) : path;
-      // Convert backslashes to forward slashes
-      cleaned = cleaned.replace(/\\/g, '/');
-      // Remove leading slash if present to make it relative
-      cleaned = cleaned.startsWith('/') ? cleaned.substring(1) : cleaned;
-      return cleaned;
-    });
+    // Resolve glob patterns to actual file paths
+    const { resolved: finalFiles } = resolveGlobPatterns(inputPaths);
+
+    if (finalFiles.length === 0) {
+      console.warn('No files resolved from patterns:', inputPaths);
+      return;
+    }
+
+    // Files are already normalized in resolveGlobPatterns
 
     setIsCreating(true);
     try {
@@ -287,9 +396,26 @@ export function ProfileCreationDialog({
     setFileTree(updateTree(fileTree));
   };
 
-  const finalFileCount = activeTab === 'manual' 
-    ? manualFiles.split('\n').filter(f => f.trim()).length
-    : selectedFiles.size;
+  // Calculate accurate file count
+  const finalFileCount = useMemo(() => {
+    if (activeTab === 'manual') {
+      const inputPaths = manualFiles.split('\n').map(f => f.trim()).filter(Boolean);
+      if (inputPaths.length === 0) return 0;
+      
+      // Check if any paths are glob patterns
+      const hasGlobPatterns = inputPaths.some(path => 
+        path.includes('*') || path.includes('?') || path.includes('[')
+      );
+      
+      if (hasGlobPatterns) {
+        return totalResolvedCount;
+      } else {
+        // Count valid direct paths
+        return Object.values(currentValidation).filter(v => v === 'valid').length;
+      }
+    }
+    return selectedFiles.size;
+  }, [activeTab, manualFiles, totalResolvedCount, currentValidation, selectedFiles.size]);
 
   const canCreate = profileName.trim() && finalFileCount > 0;
 
@@ -298,6 +424,13 @@ export function ProfileCreationDialog({
   return (
     <>
       <style>{`
+        .custom-scrollbar {
+          /* Firefox scrollbar styling */
+          scrollbar-width: thin;
+          scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted));
+        }
+        
+        /* Webkit scrollbar styling */
         .custom-scrollbar::-webkit-scrollbar {
           width: 12px;
         }
@@ -440,10 +573,6 @@ export function ProfileCreationDialog({
                 
                 <div 
                   className="flex-1 border rounded-md overflow-y-auto min-h-[300px] max-h-96 custom-scrollbar"
-                  style={{
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: '#cbd5e1 #f1f5f9'
-                  }}
                 >
                   {isLoading ? (
                     <div className="flex items-center justify-center h-32">
@@ -460,14 +589,155 @@ export function ProfileCreationDialog({
               <TabsContent value="manual" className="flex-1 flex flex-col mt-4 min-h-0">
                 <div className="mb-3">
                   <label className="text-sm font-medium mb-2 block">File Paths</label>
-                  <p className="text-xs text-muted-foreground mb-2">Enter one file path per line</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Enter one file path per line. Paths will be validated against your project files.
+                  </p>
+                  <div className="text-xs text-muted-foreground/80 space-y-1">
+                    <div>• Use relative paths from project root (e.g., <code className="bg-muted px-1 rounded">src/components/Button.tsx</code>)</div>
+                    <div>• Glob patterns supported:</div>
+                    <div className="ml-4 space-y-0.5">
+                      <div>- <code className="bg-muted px-1 rounded">src/**/*.ts</code> (all TypeScript files in src/)</div>
+                      <div>- <code className="bg-muted px-1 rounded">src/components/*.tsx</code> (React components)</div>
+                      <div>- <code className="bg-muted px-1 rounded">**/*.test.js</code> (all test files)</div>
+                    </div>
+                  </div>
                 </div>
-                <Textarea
-                  placeholder="/src/auth/auth.service.ts&#10;/src/models/user.model.ts&#10;/src/controllers/auth.controller.ts"
-                  value={manualFiles}
-                  onChange={(e) => handleManualFilesChange(e.target.value)}
-                  className="flex-1 min-h-0 font-mono text-sm"
-                />
+                
+                <div className="flex-1 flex flex-col min-h-0 gap-3">
+                  {/* Enhanced textarea with better height allocation */}
+                  <div className="flex-1 relative min-h-0">
+                    <Textarea
+                      placeholder={`src/auth/auth.service.ts
+src/models/user.model.ts
+src/controllers/auth.controller.ts
+
+Enter file paths here...`}
+                      value={manualFiles}
+                      onChange={(e) => handleManualFilesChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        // Allow Tab key to insert tab character instead of changing focus
+                        if (e.key === 'Tab') {
+                          e.preventDefault();
+                          const target = e.target as HTMLTextAreaElement;
+                          const start = target.selectionStart;
+                          const end = target.selectionEnd;
+                          const newValue = manualFiles.substring(0, start) + '\t' + manualFiles.substring(end);
+                          
+                          // Update state directly without going through handler to avoid cursor issues
+                          setManualFiles(newValue);
+                          const files = newValue.split('\n').map(f => f.trim()).filter(Boolean);
+                          setSelectedFiles(new Set(files));
+                          
+                          // Restore cursor position
+                          requestAnimationFrame(() => {
+                            target.selectionStart = target.selectionEnd = start + 1;
+                          });
+                        }
+                      }}
+                      className="h-full resize-none font-mono text-sm leading-relaxed custom-scrollbar"
+                      style={{ 
+                        minHeight: '200px',
+                        whiteSpace: 'pre-wrap',
+                        wordWrap: 'break-word'
+                      }}
+                      spellCheck={false}
+                    />
+                  </div>
+                  
+                  {/* File validation feedback */}
+                  {manualFiles.trim() && (
+                    <div className="border rounded-md p-3 bg-muted/30 max-h-32 overflow-y-auto custom-scrollbar">
+                      <div className="space-y-2 mb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-medium text-muted-foreground">Path Validation:</div>
+                          <div className="flex items-center gap-3 text-xs">
+                            {Object.values(currentValidation).filter(v => v === 'valid').length > 0 && (
+                              <span className="text-green-600 dark:text-green-400">
+                                ✓ {Object.values(currentValidation).filter(v => v === 'valid').length} direct
+                              </span>
+                            )}
+                            {Object.values(currentValidation).filter(v => v === 'glob').length > 0 && (
+                              <span className="text-blue-600 dark:text-blue-400">
+                                🔍 {Object.values(currentValidation).filter(v => v === 'glob').length} patterns
+                              </span>
+                            )}
+                            {Object.values(currentValidation).filter(v => v === 'invalid').length > 0 && (
+                              <span className="text-red-600 dark:text-red-400">
+                                ✗ {Object.values(currentValidation).filter(v => v === 'invalid').length} invalid
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {totalResolvedCount > 0 && (
+                          <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                            <strong>{totalResolvedCount} unique files</strong> will be included in the profile
+                            {Object.values(globMatches).reduce((sum, matches) => sum + matches.length, 0) > totalResolvedCount && (
+                              <span className="ml-1">(patterns may overlap)</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {manualFiles.split('\n').map((path, index) => {
+                          const trimmedPath = path.trim();
+                          if (!trimmedPath) return null;
+                          
+                          const status = currentValidation[path];
+                          const statusColor = status === 'valid' 
+                            ? 'text-green-600 dark:text-green-400' 
+                            : status === 'glob'
+                            ? 'text-blue-600 dark:text-blue-400'
+                            : 'text-red-600 dark:text-red-400';
+                          
+                          const statusIcon = status === 'valid' 
+                            ? '✓' 
+                            : status === 'glob'
+                            ? '🔍'
+                            : '✗';
+                          
+                          return (
+                            <div key={index} className="space-y-1">
+                              <div className="flex items-start gap-2 text-xs">
+                                <span className={`${statusColor} font-mono flex-shrink-0 mt-0.5`}>
+                                  {statusIcon}
+                                </span>
+                                <span className="font-mono text-foreground/80 break-all flex-1">
+                                  {trimmedPath}
+                                </span>
+                                {status === 'glob' && (
+                                  <span className="text-blue-600 dark:text-blue-400 text-xs">
+                                    ({globMatches[path]?.length || 0} files)
+                                  </span>
+                                )}
+                                {status === 'invalid' && (
+                                  <span className="text-red-600 dark:text-red-400 text-xs">
+                                    (not found)
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Show first few glob matches */}
+                              {status === 'glob' && globMatches[path] && globMatches[path].length > 0 && (
+                                <div className="ml-6 space-y-0.5">
+                                  {globMatches[path].slice(0, 3).map((match, matchIndex) => (
+                                    <div key={matchIndex} className="text-xs text-muted-foreground font-mono">
+                                      → {match}
+                                    </div>
+                                  ))}
+                                  {globMatches[path].length > 3 && (
+                                    <div className="text-xs text-muted-foreground italic">
+                                      ... and {globMatches[path].length - 3} more
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
           </div>

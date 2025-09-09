@@ -3,9 +3,11 @@
 // Architecture: Simplified layout with better information hierarchy and inline filtering
 // Dependencies: Enhanced app store with note persistence, existing UI components, improved state management.
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, memo, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
+import { useNotesStore, useProjectNotes, useSelectedNoteId, useNotesLoading, useNotesSaving, useNotesSearch } from '../store/notesStore';
 import { ProjectNote } from '../api';
+import { usePerformanceMonitor } from '../hooks/usePerformance';
 import { Textarea } from './ui/textarea';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -33,30 +35,35 @@ const createNewNote = (title: string = "Untitled Note"): ProjectNote => ({
   is_favorited: false,
 });
 
-export function NotesInterface() {
-  const {
-    currentProject,
-    projectNotes,
-    isNotesLoading,
-    saveNote,
-    deleteNote,
+export const NotesInterface = memo(() => {
+  const { currentProject, saveNote, deleteNote, loadProjectNotes } = useAppStore();
+  const projectNotes = useProjectNotes();
+  const selectedNoteId = useSelectedNoteId();
+  const isNotesLoading = useNotesLoading();
+  const isSaving = useNotesSaving();
+  const { searchTerm, showFavoritesOnly, sortBy } = useNotesSearch();
+  const { 
+    setSelectedNoteId, 
+    setSearchTerm, 
+    setShowFavoritesOnly, 
+    setSortBy,
     updateNote,
-    loadProjectNotes
-  } = useAppStore();
+    addNote,
+    setSaving,
+    setHasUnsavedChanges
+  } = useNotesStore();
+
+  // Performance monitoring
+  usePerformanceMonitor('NotesInterface');
 
   // Local state
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'modified' | 'created' | 'title'>('modified');
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChangesLocal] = useState(false);
 
   // Refs
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const saveTimeoutRef = useRef<number>();
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Load notes when project changes
   useEffect(() => {
@@ -112,34 +119,35 @@ export function NotesInterface() {
   );
 
   // Auto-save functionality
-  const autoSave = useMemo(() => {
-    return (note: ProjectNote) => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+  const autoSave = useCallback((note: ProjectNote) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    setHasUnsavedChangesLocal(true);
+    setHasUnsavedChanges(true);
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        setSaving(true);
+        await saveNote(note);
+        setHasUnsavedChangesLocal(false);
+        setHasUnsavedChanges(false);
+      } catch (error) {
+        console.error('Failed to auto-save note:', error);
+      } finally {
+        setSaving(false);
       }
-
-      setHasUnsavedChanges(true);
-
-      saveTimeoutRef.current = setTimeout(async () => {
-        try {
-          setIsSaving(true);
-          await saveNote(note);
-          setHasUnsavedChanges(false);
-        } catch (error) {
-          console.error('Failed to auto-save note:', error);
-        } finally {
-          setIsSaving(false);
-        }
-      }, 1000);
-    };
-  }, [saveNote]);
+    }, 1000);
+  }, [saveNote, setSaving, setHasUnsavedChanges, setHasUnsavedChangesLocal]);
 
   // Handlers
-  const handleCreateNote = async () => {
+  const handleCreateNote = useCallback(async () => {
     setIsCreatingNote(true);
     try {
       const newNote = createNewNote();
       await saveNote(newNote);
+      addNote(newNote);
       setSelectedNoteId(newNote.id);
       setTimeout(() => titleRef.current?.select(), 100);
     } catch (error) {
@@ -147,15 +155,15 @@ export function NotesInterface() {
     } finally {
       setIsCreatingNote(false);
     }
-  };
+  }, [saveNote, addNote, setSelectedNoteId]);
 
-  const handleUpdateNote = (field: keyof ProjectNote, value: any) => {
+  const handleUpdateNote = useCallback((field: keyof ProjectNote, value: any) => {
     if (!selectedNote) return;
 
     const updatedNote = { ...selectedNote, [field]: value };
     updateNote(selectedNote.id, { [field]: value });
     autoSave(updatedNote);
-  };
+  }, [selectedNote, updateNote, autoSave]);
 
   const handleToggleFavorite = async (noteId: string) => {
     const note = projectNotes.find(n => n.id === noteId);
@@ -444,7 +452,9 @@ export function NotesInterface() {
       </div>
     </div>
   );
-}
+});
+
+NotesInterface.displayName = 'NotesInterface';
 
 // Integration: Enhanced notes interface that integrates with the persistent storage system for automatic note management per project.
 // Notes: Provides auto-save functionality, project-specific note isolation, and seamless integration with the enhanced app store.

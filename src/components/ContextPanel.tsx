@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { LoadingSpinner } from './ui/loading-spinner';
+import { cleanPath, getFileName } from '../utils/pathUtils';
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -201,10 +202,8 @@ interface FileContextItemProps {
 function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
   const [showPreview, setShowPreview] = useState(false);
   
-  const fileName = fileContext.path.split('/').pop() || fileContext.path;
-  const relativePath = fileContext.path.startsWith('/') 
-    ? fileContext.path.substring(1) 
-    : fileContext.path;
+  const fileName = getFileName(fileContext.path);
+  const relativePath = cleanPath(fileContext.path);
 
   return (
     <div className="p-3 border-b last:border-b-0">

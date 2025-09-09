@@ -4,6 +4,7 @@
 // Dependencies: Enhanced API layer, new type definitions, existing Zustand patterns.
 
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 import { api, AnalysisResult, GitStatus, RecentProjects, ProjectNote, DevelopmentProfile, isDevelopmentMode } from '../api';
 
 interface AppState {
@@ -57,7 +58,8 @@ interface AppState {
   exportProfile: (profileId: string, format: 'json' | 'yaml' | 'xml') => Promise<string>;
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>()(
+  subscribeWithSelector((set, get) => ({
   // Initial state
   currentProject: null,
   gitStatus: null,
@@ -381,7 +383,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       document.documentElement.classList.remove('dark');
     }
   },
-}));
+})))
 
 // Integration: Enhanced store that provides complete project and note management functionality to React components.
 // Notes: Automatically loads project notes when switching projects and maintains proper state synchronization.

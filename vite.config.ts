@@ -29,6 +29,46 @@ export default defineConfig(async () => ({
       "@": path.resolve("./src"),
     },
   },
+  
+  // Performance optimizations
+  build: {
+    // Enable code splitting for better loading performance
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Separate vendor chunks for better caching
+          vendor: ['react', 'react-dom'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-toast'],
+          icons: ['lucide-react'],
+          utils: ['zustand', 'clsx', 'tailwind-merge'],
+        },
+      },
+    },
+    // Optimize chunk size
+    chunkSizeWarningLimit: 1000,
+    // Enable minification
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+  },
+  
+  // Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-window',
+      'zustand',
+      'lucide-react',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-toast',
+    ],
+  },
 }));
 
 // Integration: Works with this Tauri's build system to create the desktop application bundle.

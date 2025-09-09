@@ -3,17 +3,24 @@
 // Architecture: Clean single-view application that shows either project dashboard or workspace with integrated profiles.
 // Dependencies: Enhanced app store with profile management, UI components, error handling.
 
-import { useEffect } from 'react';
+import { useEffect, memo } from 'react';
 import { useAppStore } from './store/appStore';
+import { useTheme } from './store/uiStore';
 import { ProjectDashboard } from './components/ProjectDashboard';
 import { ProjectWorkspace } from './components/ProjectWorkspace';
 import { Toaster } from './components/ui/sonner';
 import { LoadingSpinner } from './components/ui/loading-spinner';
 import { Titlebar } from './components/ui/titlebar';
-import { initializeFrontend } from './init';
 
-function App() {
-  const { currentProject, isLoading, error, initializeApp, theme } = useAppStore();
+import { initializeFrontend } from './init';
+import { usePerformanceMonitor } from './hooks/usePerformance';
+
+const App = memo(() => {
+  const { currentProject, isLoading, error, initializeApp } = useAppStore();
+  const theme = useTheme();
+
+  // Performance monitoring in development
+  usePerformanceMonitor('App');
 
   useEffect(() => {
     const initialize = async () => {
@@ -41,7 +48,7 @@ function App() {
           <div className="text-center max-w-md">
             <h1 className="text-2xl font-bold text-destructive mb-2">Error</h1>
             <p className="text-muted-foreground mb-4">{error}</p>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
             >
@@ -80,7 +87,9 @@ function App() {
       <Toaster />
     </div>
   );
-}
+});
+
+App.displayName = 'App';
 
 export default App;
 

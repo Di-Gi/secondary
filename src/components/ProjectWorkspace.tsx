@@ -3,67 +3,84 @@
 // Architecture: Layout component that orchestrates profiles, symbol explorer, AI chat, and project information display.
 // Dependencies: React hooks, app store, profile components, UI components, workspace sub-components.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
+import { useUIStore, useActiveTab, useSidebarState } from '../store/uiStore';
+// Removed unused import - using appStore directly
 import { Button } from './ui/button';
 import { SymbolExplorer } from './SymbolExplorer';
 import { AIChatInterface } from './AIChatInterface';
 import { NotesInterface } from './NotesInterface';
 import { GitStatusDisplay } from './GitStatusDisplay';
 import { SettingsDialog } from './SettingsDialog';
+import { usePerformanceMonitor, useThrottle } from '../hooks/usePerformance';
 
 import { ArrowLeft, FolderOpen, Code, Bot, BookMarked, ChevronLeft, ChevronRight, Maximize2, Minimize2, Settings } from 'lucide-react';
 
 type SidebarSize = 'collapsed' | 'narrow' | 'normal' | 'wide';
 
-export function ProjectWorkspace() {
-  const { currentProject, clearProject, gitStatus } = useAppStore();
-  const [activeTab, setActiveTab] = useState<'chat' | 'notes'>('chat');
+export const ProjectWorkspace = memo(() => {
+  const { currentProject, gitStatus, clearProject } = useAppStore();
+  const activeTab = useActiveTab();
+  const { collapsed: sidebarCollapsed, width: sidebarWidth } = useSidebarState();
+  const { setActiveTab, setSidebarCollapsed, setSidebarWidth } = useUIStore();
+  
+  // Performance monitoring
+  usePerformanceMonitor('ProjectWorkspace');
   const [sidebarSize, setSidebarSize] = useState<SidebarSize>('normal');
   const [isResizing, setIsResizing] = useState(false);
   const [customWidth, setCustomWidth] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Throttled resize handler for better performance
+  const throttledResize = useThrottle((newWidth: number) => {
+    setSidebarWidth(newWidth);
+    setCustomWidth(newWidth);
+  }, 16); // ~60fps
+
   if (!currentProject) {
     return null;
   }
 
-  const getSidebarWidth = () => {
+  const getSidebarWidth = useCallback(() => {
     if (customWidth) return customWidth;
+    if (sidebarCollapsed) return 48;
 
     switch (sidebarSize) {
       case 'collapsed': return 48;
       case 'narrow': return 240;
-      case 'normal': return 350;
+      case 'normal': return sidebarWidth || 350;
       case 'wide': return 480;
-      default: return 350;
+      default: return sidebarWidth || 350;
     }
-  };
+  }, [customWidth, sidebarCollapsed, sidebarSize, sidebarWidth]);
 
-  const toggleCollapse = () => {
-    setSidebarSize(prev => prev === 'collapsed' ? 'normal' : 'collapsed');
+  const toggleCollapse = useCallback(() => {
+    const newCollapsed = !sidebarCollapsed;
+    setSidebarCollapsed(newCollapsed);
+    setSidebarSize(newCollapsed ? 'collapsed' : 'normal');
     setCustomWidth(null);
-  };
+  }, [sidebarCollapsed, setSidebarCollapsed]);
 
-  const cycleSizeUp = () => {
+  const cycleSizeUp = useCallback(() => {
     const sizes: SidebarSize[] = ['narrow', 'normal', 'wide'];
     const currentIndex = sizes.indexOf(sidebarSize);
     const nextIndex = (currentIndex + 1) % sizes.length;
     setSidebarSize(sizes[nextIndex]);
     setCustomWidth(null);
-  };
+  }, [sidebarSize]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsResizing(true);
     e.preventDefault();
-  };
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
 
       const newWidth = Math.max(240, Math.min(600, e.clientX));
-      setCustomWidth(newWidth);
+      throttledResize(newWidth);
 
       // Auto-adjust size based on width
       if (newWidth < 280) setSidebarSize('narrow');
@@ -84,7 +101,7 @@ export function ProjectWorkspace() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing]);
+  }, [isResizing, throttledResize]);
 
   return (
     <div className="flex h-full bg-background">
@@ -157,9 +174,9 @@ export function ProjectWorkspace() {
               size="sm"
               onClick={toggleCollapse}
               className="h-7 w-7 p-0"
-              title={sidebarSize === 'collapsed' ? 'Expand' : 'Collapse'}
+              title={sidebarCollapsed ? 'Expand' : 'Collapse'}
             >
-              {sidebarSize === 'collapsed' ? (
+              {sidebarCollapsed ? (
                 <ChevronRight className="h-3 w-3" />
               ) : (
                 <ChevronLeft className="h-3 w-3" />
@@ -179,7 +196,7 @@ export function ProjectWorkspace() {
 
         {/* Sidebar Content */}
         <div className="flex-1 overflow-hidden">
-          {sidebarSize === 'collapsed' ? (
+          {sidebarCollapsed ? (
             <div className="p-2 space-y-2 text-center">
               <div className="text-xs text-muted-foreground">
                 {currentProject.symbols.length}
@@ -191,7 +208,7 @@ export function ProjectWorkspace() {
         </div>
 
         {/* Resize Handle */}
-        {sidebarSize !== 'collapsed' && (
+        {!sidebarCollapsed && (
           <div
             className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 transition-colors"
             onMouseDown={handleMouseDown}
@@ -248,4 +265,6 @@ export function ProjectWorkspace() {
       />
     </div>
   );
-}
+});
+
+ProjectWorkspace.displayName = 'ProjectWorkspace';

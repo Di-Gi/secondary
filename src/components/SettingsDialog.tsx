@@ -7,7 +7,7 @@ import { useAppStore } from '../store/appStore';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Separator } from './ui/separator';
-import { Moon, Sun, Monitor } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 
 interface SettingsDialogProps {
   open: boolean;

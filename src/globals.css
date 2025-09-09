@@ -108,6 +108,35 @@
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Optimized theme transitions */
+* {
+  transition: background-color 0.15s ease-out, 
+              border-color 0.15s ease-out, 
+              color 0.15s ease-out;
+}
+
+/* Performance optimizations */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-scroll {
+  will-change: scroll-position;
+}
+
+/* Smooth scrolling for virtualized lists */
+.virtualized-list {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* GPU acceleration for animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
 /* Titlebar drag region styles */
 [data-tauri-drag-region] {
   -webkit-app-region: drag;

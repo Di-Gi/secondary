@@ -254,7 +254,7 @@ export const ProjectWorkspace = memo(() => {
 
             {/* Tab Content */}
             <div className="flex-1 min-h-0 bg-muted/30">
-              {activeTab === 'chat' && <AIChatInterface />}
+              {activeTab === 'chat' && <AIChatInterface selectedSymbol={selectedSymbol} />}
               {activeTab === 'notes' && <NotesInterface />}
             </div>
           </div>

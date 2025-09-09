@@ -28,9 +28,19 @@ interface ChatMessage {
     profileName: string;
     fileCount: number;
   };
+  symbolContext?: {
+    identifier: string;
+    kind: string;
+    path: string;
+    line: number;
+  };
 }
 
-export function AIChatInterface() {
+interface AIChatInterfaceProps {
+  selectedSymbol?: import('../api').Symbol | null;
+}
+
+export function AIChatInterface({ selectedSymbol }: AIChatInterfaceProps) {
   const {
     currentProject,
     activeProfile,
@@ -54,38 +64,62 @@ export function AIChatInterface() {
   }, [messages]);
 
   const buildContextualQuery = async (userQuery: string): Promise<string> => {
-    if (!activeProfile) {
-      return userQuery;
+    let contextualQuery = userQuery;
+    let hasContext = false;
+
+    // Add selected symbol context
+    if (selectedSymbol) {
+      hasContext = true;
+      const { cleanPath } = await import('../utils/pathUtils');
+      const cleanedPath = cleanPath(selectedSymbol.location.path);
+      
+      contextualQuery = `Context: I'm currently looking at the symbol "${selectedSymbol.identifier}" (${selectedSymbol.kind}) located at ${cleanedPath}:${selectedSymbol.location.line}.\n\n`;
+      
+      // Try to get the file content for the selected symbol
+      try {
+        const content = await api.readFileContent(selectedSymbol.location.path);
+        contextualQuery += `--- ${cleanedPath} ---\n${content}\n\n`;
+      } catch (error) {
+        contextualQuery += `// Error reading file: ${error}\n\n`;
+      }
     }
 
-    try {
-      // Get file contents for active profile
-      const fileContents = await Promise.all(
-        activeProfile.files.map(async (filePath) => {
-          try {
-            const content = await api.readFileContent(filePath);
-            return { path: filePath, content };
-          } catch (error) {
-            return { path: filePath, content: `// Error reading file: ${error}` };
-          }
-        })
-      );
+    // Add profile context if available
+    if (activeProfile) {
+      hasContext = true;
+      try {
+        // Get file contents for active profile
+        const fileContents = await Promise.all(
+          activeProfile.files.map(async (filePath) => {
+            try {
+              const content = await api.readFileContent(filePath);
+              return { path: filePath, content };
+            } catch (error) {
+              return { path: filePath, content: `// Error reading file: ${error}` };
+            }
+          })
+        );
 
-      // Build contextual query
-      let contextualQuery = `Context: I'm working with the "${activeProfile.name}" profile which includes the following files:\n\n`;
+        if (selectedSymbol) {
+          contextualQuery += `Additionally, I'm working with the "${activeProfile.name}" profile which includes the following files:\n\n`;
+        } else {
+          contextualQuery = `Context: I'm working with the "${activeProfile.name}" profile which includes the following files:\n\n`;
+        }
 
-      fileContents.forEach(({ path, content }) => {
-        contextualQuery += `--- ${path} ---\n${content}\n\n`;
-      });
+        fileContents.forEach(({ path, content }) => {
+          contextualQuery += `--- ${path} ---\n${content}\n\n`;
+        });
+      } catch (error) {
+        console.error('Failed to build profile context:', error);
+      }
+    }
 
+    if (hasContext) {
       contextualQuery += `User Query: ${userQuery}\n\n`;
       contextualQuery += `Please provide guidance based on the provided code context.`;
-
-      return contextualQuery;
-    } catch (error) {
-      console.error('Failed to build contextual query:', error);
-      return userQuery;
     }
+
+    return contextualQuery;
   };
 
   const handleSendMessage = async () => {
@@ -99,6 +133,12 @@ export function AIChatInterface() {
       profileContext: activeProfile ? {
         profileName: activeProfile.name,
         fileCount: activeProfile.files.length
+      } : undefined,
+      symbolContext: selectedSymbol ? {
+        identifier: selectedSymbol.identifier,
+        kind: selectedSymbol.kind,
+        path: selectedSymbol.location.path,
+        line: selectedSymbol.location.line
       } : undefined,
     };
 
@@ -176,15 +216,27 @@ export function AIChatInterface() {
           <ProfileSelector />
         </div>
 
-        {activeProfile && (
-          <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 px-3 py-2 rounded-md">
-            <Sparkles className="h-4 w-4" />
-            <span>Context-aware mode with "{activeProfile.name}" profile</span>
-            <Badge variant="secondary" className="text-xs">
-              {activeProfile.files.length} files
-            </Badge>
-          </div>
-        )}
+        <div className="space-y-2">
+          {selectedSymbol && (
+            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-md">
+              <Sparkles className="h-4 w-4" />
+              <span>Focused on symbol: <code className="font-mono">{selectedSymbol.identifier}</code></span>
+              <Badge variant="secondary" className="text-xs">
+                {selectedSymbol.kind}
+              </Badge>
+            </div>
+          )}
+          
+          {activeProfile && (
+            <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 px-3 py-2 rounded-md">
+              <Sparkles className="h-4 w-4" />
+              <span>Context-aware mode with "{activeProfile.name}" profile</span>
+              <Badge variant="secondary" className="text-xs">
+                {activeProfile.files.length} files
+              </Badge>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
@@ -235,11 +287,23 @@ export function AIChatInterface() {
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted/50 text-foreground'
                 )}>
-                  {/* Profile context indicator for user messages */}
-                  {message.role === 'user' && message.profileContext && (
-                    <div className="flex items-center gap-2 mb-2 text-blue-200 text-xs">
-                      <FolderOpen className="h-3 w-3" />
-                      <span>Using {message.profileContext.profileName} ({message.profileContext.fileCount} files)</span>
+                  {/* Context indicators for user messages */}
+                  {message.role === 'user' && (message.symbolContext || message.profileContext) && (
+                    <div className="space-y-1 mb-2">
+                      {message.symbolContext && (
+                        // CHANGED: Using theme-aware color with opacity for better contrast
+                        <div className="flex items-center gap-2 text-primary-foreground/80 text-xs">
+                          <Sparkles className="h-3 w-3" />
+                          <span>Symbol: {message.symbolContext.identifier} ({message.symbolContext.kind})</span>
+                        </div>
+                      )}
+                      {message.profileContext && (
+                        // CHANGED: Using theme-aware color with opacity for better contrast
+                        <div className="flex items-center gap-2 text-primary-foreground/80 text-xs">
+                          <FolderOpen className="h-3 w-3" />
+                          <span>Profile: {message.profileContext.profileName} ({message.profileContext.fileCount} files)</span>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -301,7 +365,9 @@ export function AIChatInterface() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                activeProfile
+                selectedSymbol
+                  ? `Ask about ${selectedSymbol.identifier}...`
+                  : activeProfile
                   ? `Ask about your ${activeProfile.name} files...`
                   : "Ask a question about your code..."
               }

@@ -114,9 +114,9 @@ export function ProfileSelector() {
     <div className="flex items-center gap-2">
       {/* Active Profile Indicator */}
       {activeProfile && (
-        <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-md">
-          <FolderOpen className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-900">{activeProfile.name}</span>
+        <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+          <FolderOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <span className="text-sm font-medium text-blue-900 dark:text-blue-100">{activeProfile.name}</span>
           <Badge variant="secondary" className="text-xs">
             {activeProfile.files.length} files
           </Badge>
@@ -124,7 +124,7 @@ export function ProfileSelector() {
             size="sm"
             variant="ghost"
             onClick={clearActiveProfile}
-            className="h-5 w-5 p-0 text-blue-600 hover:text-blue-800"
+            className="h-5 w-5 p-0 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             <X className="h-3 w-3" />
           </Button>
@@ -153,7 +153,7 @@ export function ProfileSelector() {
           <DropdownMenuSeparator />
 
           {developmentProfiles.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-muted-foreground">
               <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No profiles yet</p>
               <p className="text-xs">Create one to get started</p>
@@ -184,7 +184,7 @@ export function ProfileSelector() {
                       size="sm"
                       variant="ghost"
                       onClick={(e) => handleDeleteProfile(profile.id, e)}
-                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                      className="h-6 w-6 p-0 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -192,18 +192,18 @@ export function ProfileSelector() {
                 </div>
 
                 {profile.description && (
-                  <p className="text-xs text-gray-600 mb-2">{profile.description}</p>
+                  <p className="text-xs text-muted-foreground mb-2">{profile.description}</p>
                 )}
 
                 <div className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
-                      <FileText className="h-3 w-3 text-gray-400" />
-                      <span className="text-xs text-gray-500">{profile.files.length}</span>
+                      <FileText className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">{profile.files.length}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3 text-gray-400" />
-                      <span className="text-xs text-gray-500">{formatDate(profile.last_used)}</span>
+                      <Clock className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">{formatDate(profile.last_used)}</span>
                     </div>
                   </div>
 
@@ -268,12 +268,12 @@ export function ProfileSelector() {
             </div>
 
             {selectedExportProfile && (
-              <div className="p-3 bg-gray-50 rounded-md">
+              <div className="p-3 bg-muted rounded-md">
                 <div className="text-sm font-medium mb-1">{selectedExportProfile.name}</div>
-                <div className="text-xs text-gray-600 mb-2">
+                <div className="text-xs text-muted-foreground mb-2">
                   {selectedExportProfile.files.length} files • {selectedExportProfile.tags.join(', ')}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   Files will be included with their current content
                 </div>
               </div>

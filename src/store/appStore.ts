@@ -26,6 +26,11 @@ interface AppState {
   // UI state
   isLoading: boolean;
   error: string | null;
+  theme: 'light' | 'dark';
+  
+  // Theme actions
+  toggleTheme: () => void;
+  setTheme: (theme: 'light' | 'dark') => void;
   
   // Actions
   initializeApp: () => Promise<void>;
@@ -64,6 +69,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isProfilesLoading: false,
   isLoading: false,
   error: null,
+  theme: (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
 
   // Initialize app and load recent projects
   initializeApp: async () => {
@@ -344,6 +350,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error('Failed to export profile:', error);
       throw error;
+    }
+  },
+
+  // Toggle between light and dark theme
+  toggleTheme: () => {
+    const { theme } = get();
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    
+    set({ theme: newTheme });
+    localStorage.setItem('theme', newTheme);
+    
+    // Apply theme to document
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  },
+
+  // Set specific theme
+  setTheme: (theme: 'light' | 'dark') => {
+    set({ theme });
+    localStorage.setItem('theme', theme);
+    
+    // Apply theme to document
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
   },
 }));

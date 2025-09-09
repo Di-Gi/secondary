@@ -197,7 +197,7 @@ export function NotesInterface() {
 
   if (!currentProject) {
     return (
-      <div className="flex h-full items-center justify-center text-gray-500">
+      <div className="flex h-full items-center justify-center text-muted-foreground">
         <div className="text-center">
           <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <h3 className="font-medium mb-2">No Project Selected</h3>
@@ -216,13 +216,13 @@ export function NotesInterface() {
   }
 
   return (
-    <div className="flex h-full bg-gray-50">
+    <div className="flex h-full bg-muted/30">
       {/* Note List Sidebar */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="w-80 bg-background border-r border-border flex flex-col">
         {/* Header with Search and Controls */}
-        <div className="p-4 border-b border-gray-200 space-y-3">
+        <div className="p-4 border-b border-border space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Notes</h2>
+            <h2 className="font-semibold text-foreground">Notes</h2>
             <Button
               size="sm"
               onClick={handleCreateNote}
@@ -238,7 +238,7 @@ export function NotesInterface() {
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search notes..."
               value={searchTerm}
@@ -283,7 +283,7 @@ export function NotesInterface() {
         {/* Note List */}
         <div className="flex-1 overflow-y-auto">
           {filteredNotes.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-muted-foreground">
               <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No notes found</p>
               {searchTerm && (
@@ -299,12 +299,12 @@ export function NotesInterface() {
                   className={cn(
                     'p-3 rounded-lg cursor-pointer transition-all group border',
                     selectedNoteId === note.id
-                      ? 'bg-blue-50 border-blue-200 shadow-sm'
-                      : 'hover:bg-gray-50 border-transparent hover:border-gray-200'
+                      ? 'bg-primary/10 border-primary/20 shadow-sm'
+                      : 'hover:bg-muted/50 border-transparent hover:border-border'
                   )}
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium text-sm text-gray-900 truncate pr-2 flex-1">
+                    <h4 className="font-medium text-sm text-foreground truncate pr-2 flex-1">
                       {note.title}
                     </h4>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -319,7 +319,7 @@ export function NotesInterface() {
                       >
                         <Star className={cn(
                           "h-3 w-3",
-                          note.is_favorited ? "text-yellow-500 fill-current" : "text-gray-400"
+                          note.is_favorited ? "text-yellow-500 fill-current" : "text-muted-foreground"
                         )} />
                       </Button>
                       <Button
@@ -331,12 +331,12 @@ export function NotesInterface() {
                         }}
                         className="h-6 w-6 p-0"
                       >
-                        <Trash2 className="h-3 w-3 text-red-500" />
+                        <Trash2 className="h-3 w-3 text-red-500 dark:text-red-400" />
                       </Button>
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-600 mb-2 overflow-hidden" style={{
+                  <p className="text-xs text-muted-foreground mb-2 overflow-hidden" style={{
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical'
@@ -345,7 +345,7 @@ export function NotesInterface() {
                   </p>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-muted-foreground">
                       {formatDate(note.last_modified)}
                     </span>
 
@@ -361,11 +361,11 @@ export function NotesInterface() {
       </div>
 
       {/* Editor */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-background">
         {selectedNote ? (
           <>
             {/* Editor Header */}
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-border">
               <div className="flex items-center justify-between mb-2">
                 <Input
                   ref={titleRef}
@@ -377,7 +377,7 @@ export function NotesInterface() {
 
                 <div className="flex items-center gap-2 ml-4">
                   {(isSaving || hasUnsavedChanges) && (
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       {isSaving ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -385,7 +385,7 @@ export function NotesInterface() {
                         </>
                       ) : (
                         <>
-                          <span className="h-2 w-2 bg-orange-400 rounded-full"></span>
+                          <span className="h-2 w-2 bg-orange-400 dark:bg-orange-500 rounded-full"></span>
                           <span>Unsaved</span>
                         </>
                       )}
@@ -401,14 +401,14 @@ export function NotesInterface() {
                         'h-4 w-4',
                         selectedNote.is_favorited
                           ? 'text-yellow-500 fill-current'
-                          : 'text-gray-400'
+                          : 'text-muted-foreground'
                       )}
                     />
                   </Button>
                 </div>
               </div>
 
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 Modified {formatDate(selectedNote.last_modified)}
               </div>
             </div>
@@ -425,7 +425,7 @@ export function NotesInterface() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <h3 className="font-medium mb-2">Select a note to begin</h3>

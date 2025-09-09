@@ -45,7 +45,7 @@ export function CodeViewer({ symbol, onClose }: CodeViewerProps) {
       return (
         <div className="flex items-center justify-center py-12">
           <LoadingSpinner size="lg" />
-          <span className="ml-3 text-gray-600">Loading file content...</span>
+          <span className="ml-3 text-muted-foreground">Loading file content...</span>
         </div>
       );
     }
@@ -54,9 +54,9 @@ export function CodeViewer({ symbol, onClose }: CodeViewerProps) {
       return (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-red-600 font-medium">Failed to load file</p>
-            <p className="text-gray-500 text-sm mt-1">{error}</p>
+            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-red-600 dark:text-red-400 font-medium">Failed to load file</p>
+            <p className="text-muted-foreground text-sm mt-1">{error}</p>
           </div>
         </div>
       );
@@ -66,7 +66,7 @@ export function CodeViewer({ symbol, onClose }: CodeViewerProps) {
     const targetLine = symbol.location.line;
 
     return (
-      <div className="bg-gray-50 rounded-md border">
+      <div className="bg-muted/30 rounded-md border">
         <div className="max-h-96 overflow-y-auto">
           <pre className="text-sm">
             {lines.map((line, index) => {
@@ -78,14 +78,14 @@ export function CodeViewer({ symbol, onClose }: CodeViewerProps) {
                   key={lineNumber}
                   className={`flex ${
                     isTargetLine 
-                      ? 'bg-yellow-100 border-l-4 border-yellow-400' 
-                      : 'hover:bg-gray-100'
+                      ? 'bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-400 dark:border-yellow-500' 
+                      : 'hover:bg-muted/50'
                   }`}
                 >
-                  <span className="inline-block w-12 text-right text-gray-400 text-xs py-1 px-2 select-none border-r">
+                  <span className="inline-block w-12 text-right text-muted-foreground text-xs py-1 px-2 select-none border-r">
                     {lineNumber}
                   </span>
-                  <code className="flex-1 py-1 px-3 whitespace-pre-wrap break-all">
+                  <code className="flex-1 py-1 px-3 whitespace-pre-wrap break-all text-foreground">
                     {line || ' '}
                   </code>
                 </div>
@@ -102,10 +102,10 @@ export function CodeViewer({ symbol, onClose }: CodeViewerProps) {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <FileText className="h-5 w-5 text-gray-500" />
+            <FileText className="h-5 w-5 text-muted-foreground" />
             <div>
               <CardTitle className="text-lg">{symbol.identifier}</CardTitle>
-              <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                 <MapPin className="h-3 w-3" />
                 <span>{getFileName()}</span>
                 <span>•</span>
@@ -119,7 +119,7 @@ export function CodeViewer({ symbol, onClose }: CodeViewerProps) {
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </Button>

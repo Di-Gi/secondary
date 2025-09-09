@@ -63,35 +63,35 @@ export function Titlebar({ title = "Secondary Mind" }: TitlebarProps) {
 
   return (
     <div 
-      className="flex items-center justify-between h-8 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 select-none"
+      className="flex items-center justify-between h-8 bg-gradient-to-r from-background to-muted/50 border-b border-border select-none"
       data-tauri-drag-region
     >
       {/* Left side - App title */}
       <div className="flex items-center px-3">
-        <span className="text-sm font-medium text-gray-700">{title}</span>
+        <span className="text-sm font-medium text-foreground">{title}</span>
       </div>
 
       {/* Right side - Window controls */}
       <div className="flex">
         <button
           onClick={handleMinimize}
-          className="flex items-center justify-center w-12 h-8 hover:bg-gray-200 transition-colors duration-150"
+          className="flex items-center justify-center w-12 h-8 hover:bg-muted transition-colors duration-150"
           aria-label="Minimize"
         >
-          <Minus size={14} className="text-gray-600" />
+          <Minus size={14} className="text-muted-foreground" />
         </button>
         
         <button
           onClick={handleMaximize}
-          className="flex items-center justify-center w-12 h-8 hover:bg-gray-200 transition-colors duration-150"
+          className="flex items-center justify-center w-12 h-8 hover:bg-muted transition-colors duration-150"
           aria-label={isMaximized ? "Restore" : "Maximize"}
         >
-          <Square size={12} className="text-gray-600" />
+          <Square size={12} className="text-muted-foreground" />
         </button>
         
         <button
           onClick={handleClose}
-          className="flex items-center justify-center w-12 h-8 hover:bg-red-500 hover:text-white transition-colors duration-150"
+          className="flex items-center justify-center w-12 h-8 hover:bg-destructive hover:text-destructive-foreground transition-colors duration-150"
           aria-label="Close"
         >
           <X size={14} />

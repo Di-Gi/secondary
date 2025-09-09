@@ -99,7 +99,7 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
         <CardContent className="flex items-center justify-center h-32">
           <div className="text-center">
             <LoadingSpinner size="default" />
-            <p className="text-sm text-gray-600 mt-2">Collecting context...</p>
+            <p className="text-sm text-muted-foreground mt-2">Collecting context...</p>
           </div>
         </CardContent>
       </Card>
@@ -111,7 +111,7 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
       <Card className="h-full">
         <CardContent className="flex items-center justify-center h-32">
           <div className="text-center">
-            <p className="text-sm text-red-600 mb-2">{error}</p>
+            <p className="text-sm text-red-600 dark:text-red-400 mb-2">{error}</p>
             <Button size="sm" variant="outline" onClick={collectContext}>
               Retry
             </Button>
@@ -125,7 +125,7 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
     return (
       <Card className="h-full">
         <CardContent className="flex items-center justify-center h-32">
-          <p className="text-sm text-gray-500">No context available</p>
+          <p className="text-sm text-muted-foreground">No context available</p>
         </CardContent>
       </Card>
     );
@@ -150,7 +150,7 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
           <div key={section.id} className="border rounded-lg">
             <button
               onClick={() => toggleSection(section.id)}
-              className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between p-3 text-left hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-center gap-2">
                 {getSectionIcon(section.id)}
@@ -169,7 +169,7 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
             </button>
             
             {expandedSections.has(section.id) && (
-              <div className="border-t bg-gray-50">
+              <div className="border-t bg-muted/30">
                 {section.items.map((item, index) => (
                   <FileContextItem
                     key={`${item.path}-${index}`}
@@ -183,7 +183,7 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
         ))}
         
         {sections.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-muted-foreground">
             <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No context relationships found</p>
           </div>
@@ -211,7 +211,7 @@ function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <FileText className="h-3 w-3 text-gray-500 flex-shrink-0" />
+            <FileText className="h-3 w-3 text-muted-foreground flex-shrink-0" />
             <span className="text-sm font-medium truncate" title={relativePath}>
               {fileName}
             </span>
@@ -223,13 +223,13 @@ function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
             </Badge>
           </div>
           
-          <p className="text-xs text-gray-500 truncate mb-2" title={relativePath}>
+          <p className="text-xs text-muted-foreground truncate mb-2" title={relativePath}>
             {relativePath}
           </p>
           
           {fileContext.reference_lines.length > 0 && (
             <div className="flex items-center gap-1 mb-2">
-              <span className="text-xs text-gray-500">References:</span>
+              <span className="text-xs text-muted-foreground">References:</span>
               <div className="flex gap-1">
                 {fileContext.reference_lines.slice(0, 3).map((line) => (
                   <Badge key={line} variant="outline" className="text-xs px-1 py-0">
@@ -237,7 +237,7 @@ function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
                   </Badge>
                 ))}
                 {fileContext.reference_lines.length > 3 && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground">
                     +{fileContext.reference_lines.length - 3} more
                   </span>
                 )}
@@ -247,8 +247,8 @@ function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
           
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-blue-500" />
-              <span className="text-xs text-gray-500">
+              <div className="h-2 w-2 rounded-full bg-blue-500 dark:bg-blue-400" />
+              <span className="text-xs text-muted-foreground">
                 {Math.round(fileContext.relevance * 100)}% relevant
               </span>
             </div>
@@ -278,7 +278,7 @@ function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
       </div>
       
       {showPreview && fileContext.preview && (
-        <div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono overflow-x-auto">
+        <div className="mt-2 p-2 bg-muted rounded text-xs font-mono overflow-x-auto">
           <pre className="whitespace-pre-wrap">{fileContext.preview}</pre>
         </div>
       )}
@@ -290,18 +290,18 @@ function getRelationshipColor(relationshipType: FileContext['relationship_type']
   switch (relationshipType) {
     case 'Uses':
     case 'UsedBy':
-      return 'bg-blue-50 text-blue-700 border-blue-200';
+      return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800';
     case 'Imports':
     case 'ImportedBy':
-      return 'bg-green-50 text-green-700 border-green-200';
+      return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800';
     case 'Tests':
     case 'TestedBy':
-      return 'bg-purple-50 text-purple-700 border-purple-200';
+      return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800';
     case 'ConfiguredBy':
     case 'Configures':
-      return 'bg-orange-50 text-orange-700 border-orange-200';
+      return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800';
     default:
-      return 'bg-gray-50 text-gray-700 border-gray-200';
+      return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800/20 dark:text-gray-400 dark:border-gray-700';
   }
 }
 

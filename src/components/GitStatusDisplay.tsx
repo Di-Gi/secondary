@@ -15,11 +15,11 @@ interface GitStatusDisplayProps {
 export function GitStatusDisplay({ gitStatus }: GitStatusDisplayProps) {
   const getStatusIcon = () => {
     if (gitStatus.remote_status.includes('Up-to-date')) {
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
+      return <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />;
     } else if (gitStatus.remote_status.includes('Ahead') || gitStatus.remote_status.includes('Behind')) {
-      return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+      return <AlertCircle className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />;
     } else {
-      return <GitCommit className="h-4 w-4 text-blue-500" />;
+      return <GitCommit className="h-4 w-4 text-blue-500 dark:text-blue-400" />;
     }
   };
 
@@ -36,7 +36,7 @@ export function GitStatusDisplay({ gitStatus }: GitStatusDisplayProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <GitBranch className="h-4 w-4 text-gray-500" />
+        <GitBranch className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">{gitStatus.local_branch}</span>
       </div>
       

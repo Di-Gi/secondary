@@ -13,7 +13,7 @@ import { Titlebar } from './components/ui/titlebar';
 import { initializeFrontend } from './init';
 
 function App() {
-  const { currentProject, isLoading, error, initializeApp } = useAppStore();
+  const { currentProject, isLoading, error, initializeApp, theme } = useAppStore();
 
   useEffect(() => {
     const initialize = async () => {
@@ -24,17 +24,26 @@ function App() {
     initialize();
   }, [initializeApp]);
 
+  // Apply theme to document
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
   if (error) {
     return (
-      <div className="flex flex-col h-screen bg-gray-50">
+      <div className="flex flex-col h-screen bg-background">
         <Titlebar />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md">
-            <h1 className="text-2xl font-bold text-red-600 mb-2">Error</h1>
-            <p className="text-gray-600 mb-4">{error}</p>
+            <h1 className="text-2xl font-bold text-destructive mb-2">Error</h1>
+            <p className="text-muted-foreground mb-4">{error}</p>
             <button 
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
             >
               Reload App
             </button>
@@ -46,12 +55,12 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen bg-gray-50">
+      <div className="flex flex-col h-screen bg-background">
         <Titlebar />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <LoadingSpinner size="xl" />
-            <p className="mt-4 text-gray-600">Initializing Secondary Mind...</p>
+            <p className="mt-4 text-muted-foreground">Initializing Secondary Mind...</p>
           </div>
         </div>
       </div>
@@ -59,7 +68,7 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-background">
       <Titlebar />
       <div className="flex-1 overflow-hidden">
         {currentProject ? (

@@ -7,10 +7,10 @@ import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { LoadingSpinner } from './ui/loading-spinner';
 import { ProfileSelector } from './ProfileSelector';
-import { 
-  Send, 
-  Bot, 
-  User, 
+import {
+  Send,
+  Bot,
+  User,
   FolderOpen,
   Sparkles,
   AlertCircle,
@@ -31,9 +31,9 @@ interface ChatMessage {
 }
 
 export function AIChatInterface() {
-  const { 
-    currentProject, 
-    activeProfile, 
+  const {
+    currentProject,
+    activeProfile,
     synthesizeGuidance
   } = useAppStore();
 
@@ -41,7 +41,7 @@ export function AIChatInterface() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -73,14 +73,14 @@ export function AIChatInterface() {
 
       // Build contextual query
       let contextualQuery = `Context: I'm working with the "${activeProfile.name}" profile which includes the following files:\n\n`;
-      
+
       fileContents.forEach(({ path, content }) => {
         contextualQuery += `--- ${path} ---\n${content}\n\n`;
       });
-      
+
       contextualQuery += `User Query: ${userQuery}\n\n`;
       contextualQuery += `Please provide guidance based on the provided code context.`;
-      
+
       return contextualQuery;
     } catch (error) {
       console.error('Failed to build contextual query:', error);
@@ -109,10 +109,10 @@ export function AIChatInterface() {
     try {
       // Build contextual query if profile is active
       const contextualQuery = await buildContextualQuery(userMessage.content);
-      
+
       // Get AI response
       const response = await synthesizeGuidance(contextualQuery);
-      
+
       const assistantMessage: ChatMessage = {
         id: `msg_${Date.now()}_assistant`,
         role: 'assistant',
@@ -157,7 +157,7 @@ export function AIChatInterface() {
 
   if (!currentProject) {
     return (
-      <div className="flex h-full items-center justify-center text-gray-500">
+      <div className="flex h-full items-center justify-center text-muted-foreground">
         <div className="text-center">
           <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <h3 className="font-medium mb-2">No Project Selected</h3>
@@ -168,14 +168,14 @@ export function AIChatInterface() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-background">
       {/* Header with Profile Selector */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="font-semibold text-gray-900">AI Assistant</h2>
+          <h2 className="font-semibold text-foreground">AI Assistant</h2>
           <ProfileSelector />
         </div>
-        
+
         {activeProfile && (
           <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 px-3 py-2 rounded-md">
             <Sparkles className="h-4 w-4" />
@@ -188,9 +188,9 @@ export function AIChatInterface() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 mt-8">
+          <div className="text-center text-muted-foreground mt-8">
             <Bot className="h-16 w-16 mx-auto mb-4 opacity-30" />
             <h3 className="font-medium mb-2">Start a conversation</h3>
             <p className="text-sm mb-4">Ask questions about your code, get suggestions, or request explanations.</p>
@@ -218,9 +218,9 @@ export function AIChatInterface() {
               >
                 <div className={cn(
                   "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-                  message.role === 'user' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-600'
+                  message.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
                 )}>
                   {message.role === 'user' ? (
                     <User className="h-4 w-4" />
@@ -228,12 +228,12 @@ export function AIChatInterface() {
                     <Bot className="h-4 w-4" />
                   )}
                 </div>
-                
+
                 <div className={cn(
-                  "rounded-lg px-4 py-3",
+                  "rounded-lg px-4 py-3 min-w-0",
                   message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-900'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/50 text-foreground'
                 )}>
                   {/* Profile context indicator for user messages */}
                   {message.role === 'user' && message.profileContext && (
@@ -242,23 +242,23 @@ export function AIChatInterface() {
                       <span>Using {message.profileContext.profileName} ({message.profileContext.fileCount} files)</span>
                     </div>
                   )}
-                  
-                  <div className="whitespace-pre-wrap text-sm">
+
+                  <div className="whitespace-pre-wrap text-sm break-words overflow-wrap-anywhere">
                     {message.content}
                   </div>
-                  
+
                   <div className={cn(
                     "flex items-center justify-between mt-2 text-xs",
-                    message.role === 'user' ? 'text-blue-200' : 'text-gray-500'
+                    message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                   )}>
                     <span>{formatTimestamp(message.timestamp)}</span>
-                    
+
                     {message.role === 'assistant' && (
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => copyToClipboard(message.content, message.id)}
-                        className="h-6 w-6 p-0 hover:bg-gray-200"
+                        className="h-6 w-6 p-0 hover:bg-muted"
                       >
                         {copiedMessageId === message.id ? (
                           <Check className="h-3 w-3 text-green-600" />
@@ -273,26 +273,26 @@ export function AIChatInterface() {
             </div>
           ))
         )}
-        
+
         {isLoading && (
           <div className="flex gap-3 justify-start">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
               <Bot className="h-4 w-4" />
             </div>
-            <div className="bg-gray-100 rounded-lg px-4 py-3">
+            <div className="bg-muted/50 rounded-lg px-4 py-3">
               <div className="flex items-center gap-2">
                 <LoadingSpinner size="sm" />
-                <span className="text-sm text-gray-600">Thinking...</span>
+                <span className="text-sm text-muted-foreground">Thinking...</span>
               </div>
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-border">
         <div className="flex gap-2">
           <div className="flex-1 relative">
             <Textarea
@@ -301,22 +301,22 @@ export function AIChatInterface() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                activeProfile 
+                activeProfile
                   ? `Ask about your ${activeProfile.name} files...`
                   : "Ask a question about your code..."
               }
               className="resize-none min-h-[44px] max-h-32 pr-12"
               rows={1}
             />
-            
+
             {!activeProfile && (
-              <div className="absolute bottom-2 right-12 text-xs text-gray-400">
+              <div className="absolute bottom-2 right-12 text-xs text-muted-foreground">
                 <AlertCircle className="h-3 w-3 inline mr-1" />
                 No profile active
               </div>
             )}
           </div>
-          
+
           <Button
             onClick={handleSendMessage}
             disabled={!input.trim() || isLoading}
@@ -326,8 +326,8 @@ export function AIChatInterface() {
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        
-        <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+
+        <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
           <span>Press Enter to send, Shift+Enter for new line</span>
           {activeProfile && (
             <span className="text-blue-600">

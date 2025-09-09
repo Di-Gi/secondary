@@ -187,9 +187,9 @@ export function ProfileCreationDialog({
       <div key={node.path}>
         <div 
           className={cn(
-            "flex items-center gap-2 py-1.5 px-2 hover:bg-gray-50 rounded-sm cursor-pointer transition-colors",
-            isSelected && !node.isDirectory && "bg-blue-50 border-l-2 border-blue-500",
-            node.isDirectory && selectedChildrenCount > 0 && "bg-blue-25"
+            "flex items-center gap-2 py-1.5 px-2 hover:bg-muted/50 rounded-sm cursor-pointer transition-colors",
+            isSelected && !node.isDirectory && "bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500 dark:border-blue-400",
+            node.isDirectory && selectedChildrenCount > 0 && "bg-blue-25 dark:bg-blue-900/10"
           )}
           style={{ paddingLeft: `${depth * 20 + 8}px` }}
           onClick={() => {
@@ -203,11 +203,11 @@ export function ProfileCreationDialog({
           {node.isDirectory ? (
             <>
               {node.isExpanded ? (
-                <FolderOpen className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                <FolderOpen className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
               ) : (
-                <Folder className="h-4 w-4 text-gray-600 flex-shrink-0" />
+                <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               )}
-              <span className="text-sm font-medium text-gray-900 flex-1 min-w-0 truncate">
+              <span className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">
                 {node.name}
               </span>
               {selectedChildrenCount > 0 && (
@@ -224,12 +224,12 @@ export function ProfileCreationDialog({
                 className="h-4 w-4 flex-shrink-0"
                 onClick={(e) => e.stopPropagation()}
               />
-              <File className="h-4 w-4 text-gray-500 flex-shrink-0" />
-              <span className="text-sm text-gray-700 flex-1 min-w-0 truncate" title={node.path}>
+              <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm text-foreground flex-1 min-w-0 truncate" title={node.path}>
                 {node.name}
               </span>
               {getFileExtension(node.name) && (
-                <span className="text-xs text-gray-400 font-mono">
+                <span className="text-xs text-muted-foreground font-mono">
                   {getFileExtension(node.name)}
                 </span>
               )}
@@ -238,7 +238,7 @@ export function ProfileCreationDialog({
         </div>
         
         {node.isDirectory && node.isExpanded && node.children && (
-          <div className="border-l border-gray-200 ml-4">
+          <div className="border-l border-border ml-4">
             {node.children.map(child => renderFileNode(child, depth + 1))}
           </div>
         )}
@@ -302,20 +302,20 @@ export function ProfileCreationDialog({
           width: 12px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #f8fafc;
+          background: hsl(var(--muted));
           border-radius: 6px;
           margin: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
+          background: hsl(var(--muted-foreground) / 0.3);
           border-radius: 6px;
-          border: 2px solid #f8fafc;
+          border: 2px solid hsl(var(--muted));
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
+          background: hsl(var(--muted-foreground) / 0.5);
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:active {
-          background: #64748b;
+          background: hsl(var(--muted-foreground) / 0.7);
         }
       `}</style>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -356,17 +356,17 @@ export function ProfileCreationDialog({
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
               />
-              <p className="text-xs text-gray-500 mt-1">Comma-separated tags</p>
+              <p className="text-xs text-muted-foreground mt-1">Comma-separated tags</p>
             </div>
 
             {/* File Count Summary */}
-            <div className="p-3 bg-gray-50 rounded-md">
+            <div className="p-3 bg-muted rounded-md">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">Selected Files</span>
                 <Badge variant="secondary">{finalFileCount}</Badge>
               </div>
               {finalFileCount > 0 && (
-                <div className="text-xs text-gray-600">
+                <div className="text-xs text-muted-foreground">
                   {finalFileCount === 1 ? '1 file selected' : `${finalFileCount} files selected`}
                 </div>
               )}
@@ -390,7 +390,7 @@ export function ProfileCreationDialog({
               <TabsContent value="browse" className="flex-1 flex flex-col mt-4 min-h-0">
                 <div className="space-y-3 mb-4">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search files..."
                       value={searchTerm}
@@ -429,7 +429,7 @@ export function ProfileCreationDialog({
                           size="sm"
                           variant="ghost"
                           onClick={clearSelection}
-                          className="h-6 text-xs text-red-600 hover:text-red-700"
+                          className="h-6 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                         >
                           Clear all
                         </Button>
@@ -447,7 +447,7 @@ export function ProfileCreationDialog({
                 >
                   {isLoading ? (
                     <div className="flex items-center justify-center h-32">
-                      <div className="text-sm text-gray-500">Loading files...</div>
+                      <div className="text-sm text-muted-foreground">Loading files...</div>
                     </div>
                   ) : (
                     <div className="p-2 space-y-0.5">
@@ -460,7 +460,7 @@ export function ProfileCreationDialog({
               <TabsContent value="manual" className="flex-1 flex flex-col mt-4 min-h-0">
                 <div className="mb-3">
                   <label className="text-sm font-medium mb-2 block">File Paths</label>
-                  <p className="text-xs text-gray-500 mb-2">Enter one file path per line</p>
+                  <p className="text-xs text-muted-foreground mb-2">Enter one file path per line</p>
                 </div>
                 <Textarea
                   placeholder="/src/auth/auth.service.ts&#10;/src/models/user.model.ts&#10;/src/controllers/auth.controller.ts"

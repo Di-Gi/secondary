@@ -103,28 +103,28 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
     switch (kind) {
       // TS/JS
       case 'TSFunction':
-        return 'text-blue-600 bg-blue-50';
+        return 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20';
       case 'TSClass':
-        return 'text-sky-600 bg-sky-50';
+        return 'text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-900/20';
       case 'TSInterface':
-        return 'text-indigo-600 bg-indigo-50';
+        return 'text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/20';
       // Rust
       case 'Struct':
-        return 'text-orange-600 bg-orange-50';
+        return 'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/20';
       case 'Enum':
-        return 'text-amber-600 bg-amber-50';
+        return 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20';
       case 'Trait':
-        return 'text-purple-600 bg-purple-50';
+        return 'text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/20';
       case 'Function':
-         return 'text-teal-600 bg-teal-50';
+         return 'text-teal-600 bg-teal-50 dark:text-teal-400 dark:bg-teal-900/20';
       case 'Impl':
-         return 'text-slate-500 bg-slate-50';
+         return 'text-slate-500 bg-slate-50 dark:text-slate-400 dark:bg-slate-800/20';
       case 'Module':
-        return 'text-lime-600 bg-lime-50';
+        return 'text-lime-600 bg-lime-50 dark:text-lime-400 dark:bg-lime-900/20';
       case 'Macro':
-        return 'text-pink-600 bg-pink-50';
+        return 'text-pink-600 bg-pink-50 dark:text-pink-400 dark:bg-pink-900/20';
       default:
-        return 'text-gray-600 bg-gray-50';
+        return 'text-muted-foreground bg-muted';
     }
   };
 
@@ -171,8 +171,8 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
         return (
           <div
             key={`${symbol.location.path}-${symbol.identifier}-${symbol.location.line}-${index}`}
-            className={`group flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer border-l-2 transition-all ${
-              isSelected ? 'border-l-blue-500 bg-blue-50' : 'border-l-transparent'
+            className={`group flex items-center gap-2 px-3 py-1.5 hover:bg-muted/50 cursor-pointer border-l-2 transition-all ${
+              isSelected ? 'border-l-primary bg-primary/10' : 'border-l-transparent'
             }`}
             onClick={() => setSelectedSymbol(symbol)}
           >
@@ -182,7 +182,7 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
             <span className="font-medium text-sm truncate flex-1">
               {symbol.identifier}
             </span>
-            <span className="text-xs text-gray-400 flex-shrink-0">
+            <span className="text-xs text-muted-foreground flex-shrink-0">
               {fileName}:{symbol.location.line}
             </span>
             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -220,8 +220,8 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
         return (
           <div
             key={`${symbol.location.path}-${symbol.identifier}-${symbol.location.line}-${index}`}
-            className={`group flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer border-l-2 transition-all ${
-              isSelected ? 'border-l-blue-500 bg-blue-50' : 'border-l-transparent'
+            className={`group flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer border-l-2 transition-all ${
+              isSelected ? 'border-l-primary bg-primary/10' : 'border-l-transparent'
             }`}
             onClick={() => setSelectedSymbol(symbol)}
           >
@@ -232,7 +232,7 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
               <div className="font-medium text-sm truncate">
                 {symbol.identifier}
               </div>
-              <div className="text-xs text-gray-500 truncate">
+              <div className="text-xs text-muted-foreground truncate">
                 {fileName}:{symbol.location.line}
               </div>
             </div>
@@ -274,8 +274,8 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
         return (
           <div
             key={`${symbol.location.path}-${symbol.identifier}-${symbol.location.line}-${index}`}
-            className={`group p-3 hover:bg-gray-50 cursor-pointer border-l-2 transition-all border rounded-lg mx-2 mb-2 ${
-              isSelected ? 'border-l-blue-500 bg-blue-50 border-blue-200' : 'border-l-transparent border-gray-200'
+            className={`group p-3 hover:bg-muted/50 cursor-pointer border-l-2 transition-all border rounded-lg mx-2 mb-2 ${
+              isSelected ? 'border-l-primary bg-primary/10 border-primary/20' : 'border-l-transparent border-border'
             }`}
             onClick={() => setSelectedSymbol(symbol)}
           >
@@ -287,7 +287,7 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
                 <div className="font-medium text-sm truncate mb-1">
                   {symbol.identifier}
                 </div>
-                <div className="text-xs text-gray-500 truncate mb-2">
+                <div className="text-xs text-muted-foreground truncate mb-2">
                   {symbol.location.path.split('/').pop()}:{symbol.location.line}
                 </div>
                 <div className="flex items-center justify-between">
@@ -353,7 +353,7 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header with Search and Controls */}
-      <div className="p-3 space-y-3 border-b border-gray-200">
+      <div className="p-3 space-y-3 border-b border-border">
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-sm">Symbols</h3>
           <div className="flex items-center gap-1">
@@ -383,7 +383,7 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
         </div>
         
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search symbols..."
             value={searchTerm}
@@ -436,7 +436,7 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
       {/* Symbol List */}
       <div className="flex-1 overflow-auto">
         {filteredSymbols.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-muted-foreground">
             <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No symbols found</p>
             {searchTerm && (
@@ -452,10 +452,10 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
 
       {/* Inline Context (only when enabled and symbol selected) */}
       {showContextInline && selectedSymbol && (
-        <div className="border-t border-gray-200 max-h-48 overflow-y-auto">
+        <div className="border-t border-border max-h-48 overflow-y-auto">
           <div className="p-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-600">
+              <span className="text-xs font-medium text-muted-foreground">
                 Context for {selectedSymbol.identifier}
               </span>
               <Button
@@ -479,7 +479,7 @@ export function SymbolExplorer({ symbols }: SymbolExplorerProps) {
 
       {/* Context Panel (traditional bottom panel when not inline) */}
       {selectedSymbol && !showContextInline && (
-        <div className="border-t border-gray-200">
+        <div className="border-t border-border">
           <ContextPanel 
             symbol={selectedSymbol} 
             onFileClick={(filePath) => {

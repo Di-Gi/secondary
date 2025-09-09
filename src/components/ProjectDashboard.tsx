@@ -120,52 +120,52 @@ export function ProjectDashboard() {
   const hasRecentProjects = recentProjects && recentProjects.projects.length > 0;
 
   return (
-    <div className="h-full bg-gradient-to-br from-gray-50 via-white to-blue-50 overflow-auto">
-      <div className="max-w-7xl mx-auto px-6 py-12">
+    <div className="h-full bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
+      <div className="max-w-7xl mx-auto px-6 py-12 flex-1 flex flex-col min-h-0">
         {/* Header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-12 flex-shrink-0">
           <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="p-3 bg-blue-600 rounded-xl">
-              <Sparkles className="h-8 w-8 text-white" />
+            <div className="p-3 bg-primary rounded-xl">
+              <Sparkles className="h-8 w-8 text-primary-foreground" />
             </div>
-            <h1 className="text-4xl font-bold text-gray-900">Secondary Mind</h1>
+            <h1 className="text-4xl font-bold text-foreground">Secondary Mind</h1>
           </div>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             AI-powered codebase analysis and development guidance.
             Understand your code better, faster.
           </p>
           {isDevelopmentMode() && (
-            <div className="mt-6 inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-              <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="text-blue-800 text-sm font-medium">Development Mode</span>
+            <div className="mt-6 inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-4 py-2">
+              <div className="h-2 w-2 bg-primary rounded-full animate-pulse"></div>
+              <span className="text-primary text-sm font-medium">Development Mode</span>
             </div>
           )}
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 flex-1 min-h-0">
           {/* Primary Action */}
           <div className="lg:col-span-2">
             <Card 
               className={`h-full transition-all duration-300 border-2 ${
                 dragOver 
-                  ? 'border-blue-500 bg-blue-50 shadow-lg scale-[1.02]' 
-                  : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                  ? 'border-primary bg-primary/10 shadow-lg scale-[1.02]' 
+                  : 'border-border hover:border-primary/50 hover:shadow-md'
               }`}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
             >
               <CardContent className="flex flex-col items-center justify-center h-full p-8 text-center space-y-6">
-                <div className="p-4 bg-blue-100 rounded-full">
-                  <FolderOpen className="h-12 w-12 text-blue-600" />
+                <div className="p-4 bg-primary/10 rounded-full">
+                  <FolderOpen className="h-12 w-12 text-primary" />
                 </div>
                 
                 <div className="space-y-3">
-                  <h2 className="text-2xl font-semibold text-gray-900">
+                  <h2 className="text-2xl font-semibold text-foreground">
                     {dragOver ? 'Drop to Analyze' : 'Analyze Project'}
                   </h2>
-                  <p className="text-gray-600 max-w-sm">
+                  <p className="text-muted-foreground max-w-sm">
                     Select a project directory to begin AI-powered analysis and get intelligent insights about your codebase.
                   </p>
                 </div>
@@ -190,7 +190,7 @@ export function ProjectDashboard() {
                 </Button>
 
                 {!dragOver && (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     or drag & drop a project folder here
                   </p>
                 )}
@@ -199,9 +199,9 @@ export function ProjectDashboard() {
           </div>
 
           {/* Recent Projects */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 flex flex-col">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900">
+              <h2 className="text-2xl font-semibold text-foreground">
                 {hasRecentProjects ? 'Recent Projects' : 'Get Started'}
               </h2>
               {hasRecentProjects && (
@@ -213,121 +213,123 @@ export function ProjectDashboard() {
             </div>
 
             {hasRecentProjects ? (
-              <div className="space-y-4">
-                {recentProjects.projects.slice(0, 4).map((project) => (
-                  <Card 
-                    key={project.id}
-                    className="cursor-pointer transition-all duration-200 hover:shadow-md hover:border-blue-300 group"
-                    onClick={() => handleProjectClick(project)}
-                  >
-                    <CardContent className="p-5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className="p-2 bg-gray-100 rounded-lg">
-                              <FolderOpen className="h-5 w-5 text-gray-600" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h3 className="font-semibold text-gray-900 truncate text-lg">
-                                {project.name}
-                              </h3>
-                              <p className="text-sm text-gray-500 truncate" title={project.path}>
-                                {project.path}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-6 text-sm text-gray-600 mb-3">
-                            <div className="flex items-center gap-1">
-                              <Code className="h-4 w-4" />
-                              <span>{project.symbol_count} symbols</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <FileText className="h-4 w-4" />
-                              <span>{project.notes_count} notes</span>
-                            </div>
-                            {project.git_branch && (
-                              <div className="flex items-center gap-1">
-                                <GitBranch className="h-4 w-4" />
-                                <span className="truncate max-w-20">{project.git_branch}</span>
+              <div className="flex-1 min-h-0">
+                <div className="h-full max-h-[600px] overflow-y-auto pr-2 space-y-4">
+                  {recentProjects.projects.map((project) => (
+                    <Card 
+                      key={project.id}
+                      className="cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/50 group flex-shrink-0"
+                      onClick={() => handleProjectClick(project)}
+                    >
+                      <CardContent className="p-5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="p-2 bg-muted rounded-lg">
+                                <FolderOpen className="h-5 w-5 text-muted-foreground" />
                               </div>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-500 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {formatRelativeTime(project.last_accessed)}
-                            </span>
+                              <div className="min-w-0 flex-1">
+                                <h3 className="font-semibold text-foreground truncate text-lg">
+                                  {project.name}
+                                </h3>
+                                <p className="text-sm text-muted-foreground truncate" title={project.path}>
+                                  {project.path}
+                                </p>
+                              </div>
+                            </div>
                             
-                            {project.git_status && (
-                              <Badge 
-                                variant={project.git_status.includes('Up-to-date') ? 'default' : 'secondary'}
-                                className="text-xs"
-                              >
-                                {project.git_status.length > 25 
-                                  ? `${project.git_status.substring(0, 25)}...`
-                                  : project.git_status}
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-6 text-sm text-muted-foreground mb-3">
+                              <div className="flex items-center gap-1">
+                                <Code className="h-4 w-4" />
+                                <span>{project.symbol_count} symbols</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <FileText className="h-4 w-4" />
+                                <span>{project.notes_count} notes</span>
+                              </div>
+                              {project.git_branch && (
+                                <div className="flex items-center gap-1">
+                                  <GitBranch className="h-4 w-4" />
+                                  <span className="truncate max-w-20">{project.git_branch}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {formatRelativeTime(project.last_accessed)}
+                              </span>
+                              
+                              {project.git_status && (
+                                <Badge 
+                                  variant={project.git_status.includes('Up-to-date') ? 'default' : 'secondary'}
+                                  className="text-xs"
+                                >
+                                  {project.git_status.length > 25 
+                                    ? `${project.git_status.substring(0, 25)}...`
+                                    : project.git_status}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 ml-4">
+                            <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => handleRemoveProject(e, project.id)}
+                              disabled={removingProject === project.id}
+                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              {removingProject === project.id ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-muted-foreground" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2 ml-4">
-                          <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => handleRemoveProject(e, project.id)}
-                            disabled={removingProject === project.id}
-                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            {removingProject === project.id ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
                 
-                {recentProjects.projects.length > 4 && (
-                  <div className="text-center pt-4">
-                    <p className="text-sm text-gray-500">
-                      +{recentProjects.projects.length - 4} more projects
-                    </p>
+                {recentProjects.projects.length > 6 && (
+                  <div className="text-center pt-4 text-sm text-muted-foreground">
+                    Showing all {recentProjects.projects.length} projects
                   </div>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FeatureCard
-                  icon={<Code className="h-6 w-6" />}
-                  title="Smart Analysis"
-                  description="Automatically parse and understand your codebase structure with AI assistance."
-                  color="blue"
-                />
-                <FeatureCard
-                  icon={<GitBranch className="h-6 w-6" />}
-                  title="Git Integration"
-                  description="Track repository status and understand your development workflow."
-                  color="green"
-                />
-                <FeatureCard
-                  icon={<Zap className="h-6 w-6" />}
-                  title="AI Guidance"
-                  description="Get intelligent suggestions and answers about your code."
-                  color="yellow"
-                />
-                <FeatureCard
-                  icon={<FileText className="h-6 w-6" />}
-                  title="Project Notes"
-                  description="Keep organized notes and documentation for each project."
-                  color="purple"
-                />
+              <div className="flex-1 min-h-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-fit">
+                  <FeatureCard
+                    icon={<Code className="h-6 w-6" />}
+                    title="Smart Analysis"
+                    description="Automatically parse and understand your codebase structure with AI assistance."
+                    color="blue"
+                  />
+                  <FeatureCard
+                    icon={<GitBranch className="h-6 w-6" />}
+                    title="Git Integration"
+                    description="Track repository status and understand your development workflow."
+                    color="green"
+                  />
+                  <FeatureCard
+                    icon={<Zap className="h-6 w-6" />}
+                    title="AI Guidance"
+                    description="Get intelligent suggestions and answers about your code."
+                    color="yellow"
+                  />
+                  <FeatureCard
+                    icon={<FileText className="h-6 w-6" />}
+                    title="Project Notes"
+                    description="Keep organized notes and documentation for each project."
+                    color="purple"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -335,12 +337,12 @@ export function ProjectDashboard() {
 
         {/* Quick Tips */}
         {!hasRecentProjects && (
-          <div className="mt-16 text-center">
+          <div className="mt-12 text-center flex-shrink-0">
             <div className="max-w-2xl mx-auto">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-foreground mb-4">
                 Ready to get started?
               </h3>
-              <p className="text-gray-600 mb-8">
+              <p className="text-muted-foreground mb-8">
                 Secondary Mind works best with TypeScript, JavaScript, React, and Node.js projects.
                 Simply select your project directory and let AI analyze your codebase.
               </p>
@@ -368,10 +370,10 @@ interface FeatureCardProps {
 
 function FeatureCard({ icon, title, description, color }: FeatureCardProps) {
   const colorClasses = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    yellow: 'bg-yellow-100 text-yellow-600',
-    purple: 'bg-purple-100 text-purple-600',
+    blue: 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400',
+    green: 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400',
+    yellow: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400',
+    purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400',
   };
 
   return (
@@ -380,8 +382,8 @@ function FeatureCard({ icon, title, description, color }: FeatureCardProps) {
         <div className={`inline-flex p-3 rounded-lg mb-4 ${colorClasses[color]}`}>
           {icon}
         </div>
-        <h4 className="font-semibold text-gray-900 mb-2">{title}</h4>
-        <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
+        <h4 className="font-semibold text-foreground mb-2">{title}</h4>
+        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
       </CardContent>
     </Card>
   );

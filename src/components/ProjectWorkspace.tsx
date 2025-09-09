@@ -10,8 +10,8 @@ import { SymbolExplorer } from './SymbolExplorer';
 import { AIChatInterface } from './AIChatInterface';
 import { NotesInterface } from './NotesInterface';
 import { GitStatusDisplay } from './GitStatusDisplay';
+import { SettingsDialog } from './SettingsDialog';
 
-import { ProfileSelector } from './ProfileSelector';
 import { ArrowLeft, FolderOpen, Code, Bot, BookMarked, ChevronLeft, ChevronRight, Maximize2, Minimize2, Settings } from 'lucide-react';
 
 type SidebarSize = 'collapsed' | 'narrow' | 'normal' | 'wide';
@@ -22,6 +22,7 @@ export function ProjectWorkspace() {
   const [sidebarSize, setSidebarSize] = useState<SidebarSize>('normal');
   const [isResizing, setIsResizing] = useState(false);
   const [customWidth, setCustomWidth] = useState<number | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!currentProject) {
     return null;
@@ -29,7 +30,7 @@ export function ProjectWorkspace() {
 
   const getSidebarWidth = () => {
     if (customWidth) return customWidth;
-    
+
     switch (sidebarSize) {
       case 'collapsed': return 48;
       case 'narrow': return 240;
@@ -60,10 +61,10 @@ export function ProjectWorkspace() {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-      
+
       const newWidth = Math.max(240, Math.min(600, e.clientX));
       setCustomWidth(newWidth);
-      
+
       // Auto-adjust size based on width
       if (newWidth < 280) setSidebarSize('narrow');
       else if (newWidth < 400) setSidebarSize('normal');
@@ -86,45 +87,44 @@ export function ProjectWorkspace() {
   }, [isResizing]);
 
   return (
-    <div className="flex h-full bg-white">
+    <div className="flex h-full bg-background">
       {/* Adaptive Sidebar for Symbol Explorer */}
-      <aside 
-        className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-200 relative ${
-          isResizing ? 'select-none' : ''
-        }`}
+      <aside
+        className={`bg-background border-r border-border flex flex-col transition-all duration-200 relative ${isResizing ? 'select-none' : ''
+          }`}
         style={{ width: getSidebarWidth() }}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between p-3 border-b border-gray-200 min-h-[48px]">
+        <div className="flex items-center justify-between p-3 border-b border-border min-h-[48px]">
           {sidebarSize !== 'collapsed' && (
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <FolderOpen className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                <span className="font-semibold text-sm truncate" title={currentProject.project_path}>
+                <FolderOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="font-semibold text-sm truncate text-foreground" title={currentProject.project_path}>
                   {currentProject.project_path.split('/').pop() || 'Unknown Project'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Code className="h-3 w-3 text-gray-500" />
-                <span className="text-xs text-gray-600">
+                <Code className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">
                   {currentProject.symbols.length} symbols
                 </span>
               </div>
             </div>
           )}
-          
+
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={clearProject}
-              className="h-7 px-2 text-gray-600 hover:text-gray-900"
+              className="h-7 px-2"
               title="Close Project"
             >
               <ArrowLeft className="h-3 w-3" />
               {sidebarSize !== 'collapsed' && <span className="ml-1 text-xs">Close</span>}
             </Button>
-            
+
             {sidebarSize !== 'collapsed' && (
               <>
                 <Button
@@ -143,6 +143,7 @@ export function ProjectWorkspace() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => setSettingsOpen(true)}
                   className="h-7 w-7 p-0"
                   title="Settings"
                 >
@@ -150,7 +151,7 @@ export function ProjectWorkspace() {
                 </Button>
               </>
             )}
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -167,16 +168,11 @@ export function ProjectWorkspace() {
           </div>
         </div>
 
-        {/* Profile Selector */}
-        {sidebarSize !== 'collapsed' && (
-          <div className="px-3 py-2 border-b border-gray-200">
-            <ProfileSelector />
-          </div>
-        )}
+
 
         {/* Git Status */}
         {sidebarSize !== 'collapsed' && gitStatus && (
-          <div className="px-3 py-2 border-b border-gray-200">
+          <div className="px-3 py-2 border-b border-border">
             <GitStatusDisplay gitStatus={gitStatus} />
           </div>
         )}
@@ -185,7 +181,7 @@ export function ProjectWorkspace() {
         <div className="flex-1 overflow-hidden">
           {sidebarSize === 'collapsed' ? (
             <div className="p-2 space-y-2 text-center">
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 {currentProject.symbols.length}
               </div>
             </div>
@@ -206,34 +202,32 @@ export function ProjectWorkspace() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-white">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background">
           <div className="flex items-center gap-4">
-            <h1 className="text-lg font-semibold text-gray-900">
+            <h1 className="text-lg font-semibold text-foreground">
               {currentProject.project_path.split('/').pop() || 'Project'}
             </h1>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-border">
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'chat'
-                ? 'border-blue-500 text-blue-600 bg-blue-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'chat'
+              ? 'border-primary text-primary bg-primary/10'
+              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
           >
             <Bot className="h-4 w-4" />
             AI Chat
           </button>
           <button
             onClick={() => setActiveTab('notes')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'notes'
-                ? 'border-blue-500 text-blue-600 bg-blue-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'notes'
+              ? 'border-primary text-primary bg-primary/10'
+              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
           >
             <BookMarked className="h-4 w-4" />
             Notes
@@ -241,11 +235,17 @@ export function ProjectWorkspace() {
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 bg-gray-50">
+        <div className="flex-1 min-h-0 bg-muted/30">
           {activeTab === 'chat' && <AIChatInterface />}
           {activeTab === 'notes' && <NotesInterface />}
         </div>
       </main>
+
+      {/* Settings Dialog */}
+      <SettingsDialog 
+        open={settingsOpen} 
+        onOpenChange={setSettingsOpen} 
+      />
     </div>
   );
 }

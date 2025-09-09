@@ -11,8 +11,10 @@ import { Button } from './ui/button';
 import { SymbolExplorer } from './SymbolExplorer';
 import { AIChatInterface } from './AIChatInterface';
 import { NotesInterface } from './NotesInterface';
+import { ContextPanel } from './ContextPanel';
 import { GitStatusDisplay } from './GitStatusDisplay';
 import { SettingsDialog } from './SettingsDialog';
+import { Symbol } from '../api';
 import { usePerformanceMonitor, useThrottle } from '../hooks/usePerformance';
 
 import { ArrowLeft, FolderOpen, Code, Bot, BookMarked, ChevronLeft, ChevronRight, Maximize2, Minimize2, Settings } from 'lucide-react';
@@ -31,6 +33,7 @@ export const ProjectWorkspace = memo(() => {
   const [isResizing, setIsResizing] = useState(false);
   const [customWidth, setCustomWidth] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState<Symbol | null>(null);
 
   // Throttled resize handler for better performance
   const throttledResize = useThrottle((newWidth: number) => {
@@ -203,7 +206,10 @@ export const ProjectWorkspace = memo(() => {
               </div>
             </div>
           ) : (
-            <SymbolExplorer symbols={currentProject.symbols} />
+            <SymbolExplorer 
+              symbols={currentProject.symbols} 
+              onSymbolSelect={setSelectedSymbol}
+            />
           )}
         </div>
 
@@ -216,45 +222,54 @@ export const ProjectWorkspace = memo(() => {
         )}
       </aside>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - L-shaped layout */}
       <main className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-semibold text-foreground">
-              {currentProject.project_path.split('/').pop() || 'Project'}
-            </h1>
+        {/* Content Layout - Upper section with tabs, lower section with context */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Upper Section - AI Chat and Notes */}
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* Tab Navigation - Reduced height */}
+            <div className="flex border-b border-border">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'chat'
+                  ? 'border-primary text-primary bg-primary/10'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+              >
+                <Bot className="h-4 w-4" />
+                AI Chat
+              </button>
+              <button
+                onClick={() => setActiveTab('notes')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'notes'
+                  ? 'border-primary text-primary bg-primary/10'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+              >
+                <BookMarked className="h-4 w-4" />
+                Notes
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 min-h-0 bg-muted/30">
+              {activeTab === 'chat' && <AIChatInterface />}
+              {activeTab === 'notes' && <NotesInterface />}
+            </div>
           </div>
-        </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'chat'
-              ? 'border-primary text-primary bg-primary/10'
-              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-          >
-            <Bot className="h-4 w-4" />
-            AI Chat
-          </button>
-          <button
-            onClick={() => setActiveTab('notes')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'notes'
-              ? 'border-primary text-primary bg-primary/10'
-              : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-          >
-            <BookMarked className="h-4 w-4" />
-            Notes
-          </button>
-        </div>
-
-        {/* Tab Content */}
-        <div className="flex-1 min-h-0 bg-muted/30">
-          {activeTab === 'chat' && <AIChatInterface />}
-          {activeTab === 'notes' && <NotesInterface />}
+          {/* Lower Section - Context Panel - Increased height */}
+          {selectedSymbol && (
+            <div className="border-t border-border bg-background" style={{ height: '180px' }}>
+              <ContextPanel 
+                symbol={selectedSymbol} 
+                onFileClick={(filePath) => {
+                  console.log('File clicked:', filePath);
+                }}
+              />
+            </div>
+          )}
         </div>
       </main>
 

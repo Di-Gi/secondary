@@ -10,11 +10,11 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { LoadingSpinner } from './ui/loading-spinner';
 import { cleanPath, getFileName } from '../utils/pathUtils';
-import { 
-  ChevronDown, 
-  ChevronRight, 
-  FileText, 
-  Eye, 
+import {
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Eye,
   ExternalLink,
   Users,
   Link,
@@ -39,7 +39,7 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
   const collectContext = async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const contextData = await api.collectSymbolContext(symbol.identifier);
       setContext(contextData);
@@ -139,58 +139,71 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
   ].filter(section => section.items.length > 0);
 
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          Context for {symbol.identifier}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 max-h-96 overflow-y-auto">
-        {sections.map((section) => (
-          <div key={section.id} className="border rounded-lg">
+    <div className="h-full flex flex-col bg-background">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Context for</span>
+          <code className="text-sm font-mono bg-muted px-2 py-0.5 rounded">
+            {symbol.identifier}
+          </code>
+        </div>
+        <div className="flex items-center gap-2">
+          {sections.map((section) => (
             <button
+              key={section.id}
               onClick={() => toggleSection(section.id)}
-              className="w-full flex items-center justify-between p-3 text-left hover:bg-muted/50 transition-colors"
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${expandedSections.has(section.id)
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground'
+                }`}
             >
-              <div className="flex items-center gap-2">
-                {getSectionIcon(section.id)}
-                <span className="text-sm font-medium">
-                  {getSectionTitle(section.id)}
-                </span>
-                <Badge variant="secondary" className="text-xs">
-                  {section.items.length}
-                </Badge>
-              </div>
-              {expandedSections.has(section.id) ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
+              {getSectionIcon(section.id)}
+              <span>{getSectionTitle(section.id)}</span>
+              <Badge variant="secondary" className="text-xs h-4 px-1">
+                {section.items.length}
+              </Badge>
             </button>
-            
-            {expandedSections.has(section.id) && (
-              <div className="border-t bg-muted/30">
-                {section.items.map((item, index) => (
-                  <FileContextItem
-                    key={`${item.path}-${index}`}
-                    fileContext={item}
-                    onClick={() => handleFileClick(item)}
-                  />
-                ))}
-              </div>
-            )}
+          ))}
+        </div>
+      </div>
+
+      {/* Horizontal Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {sections.filter(section => expandedSections.has(section.id)).map((section) => (
+          <div key={section.id} className="flex-1 border-r border-border last:border-r-0 overflow-hidden">
+            <div className="h-full overflow-y-auto">
+              {section.items.map((item, index) => (
+                <CompactFileContextItem
+                  key={`${item.path}-${index}`}
+                  fileContext={item}
+                  onClick={() => handleFileClick(item)}
+                />
+              ))}
+            </div>
           </div>
         ))}
-        
-        {sections.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No context relationships found</p>
+
+        {sections.filter(section => expandedSections.has(section.id)).length === 0 && (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <FileText className="h-6 w-6 mx-auto mb-1 opacity-50" />
+              <p className="text-xs">Select a section to view context</p>
+            </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+
+        {sections.length === 0 && (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <FileText className="h-6 w-6 mx-auto mb-1 opacity-50" />
+              <p className="text-xs">No context relationships found</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -201,7 +214,7 @@ interface FileContextItemProps {
 
 function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
   const [showPreview, setShowPreview] = useState(false);
-  
+
   const fileName = getFileName(fileContext.path);
   const relativePath = cleanPath(fileContext.path);
 
@@ -214,18 +227,18 @@ function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
             <span className="text-sm font-medium truncate" title={relativePath}>
               {fileName}
             </span>
-            <Badge 
-              variant="outline" 
+            <Badge
+              variant="outline"
               className={`text-xs ${getRelationshipColor(fileContext.relationship_type)}`}
             >
               {fileContext.relationship_type}
             </Badge>
           </div>
-          
+
           <p className="text-xs text-muted-foreground truncate mb-2" title={relativePath}>
             {relativePath}
           </p>
-          
+
           {fileContext.reference_lines.length > 0 && (
             <div className="flex items-center gap-1 mb-2">
               <span className="text-xs text-muted-foreground">References:</span>
@@ -243,7 +256,7 @@ function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
               </div>
             </div>
           )}
-          
+
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
               <div className="h-2 w-2 rounded-full bg-blue-500 dark:bg-blue-400" />
@@ -253,7 +266,7 @@ function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-1">
           <Button
             size="sm"
@@ -275,12 +288,51 @@ function FileContextItem({ fileContext, onClick }: FileContextItemProps) {
           </Button>
         </div>
       </div>
-      
+
       {showPreview && fileContext.preview && (
         <div className="mt-2 p-2 bg-muted rounded text-xs font-mono overflow-x-auto">
           <pre className="whitespace-pre-wrap">{fileContext.preview}</pre>
         </div>
       )}
+    </div>
+  );
+}
+
+// Compact version for horizontal layout
+function CompactFileContextItem({ fileContext, onClick }: FileContextItemProps) {
+  const fileName = getFileName(fileContext.path);
+  const relativePath = cleanPath(fileContext.path);
+
+  return (
+    <div
+      className="flex items-center gap-2 p-2 hover:bg-muted/50 cursor-pointer border-b border-border/50 last:border-b-0"
+      onClick={onClick}
+      title={`${relativePath} - ${Math.round(fileContext.relevance * 100)}% relevant`}
+    >
+      <FileText className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-medium truncate">
+          {fileName}
+        </div>
+        <div className="text-xs text-muted-foreground truncate">
+          {relativePath}
+        </div>
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {fileContext.reference_lines.length > 0 && (
+          <Badge variant="outline" className="text-xs h-4 px-1">
+            L{fileContext.reference_lines[0]}
+            {fileContext.reference_lines.length > 1 && `+${fileContext.reference_lines.length - 1}`}
+          </Badge>
+        )}
+        <div
+          className="h-2 w-2 rounded-full"
+          style={{
+            backgroundColor: `hsl(${Math.round(fileContext.relevance * 120)}, 70%, 50%)`
+          }}
+          title={`${Math.round(fileContext.relevance * 100)}% relevant`}
+        />
+      </div>
     </div>
   );
 }

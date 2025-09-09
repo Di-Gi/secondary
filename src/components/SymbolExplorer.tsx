@@ -9,7 +9,6 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { CodeViewer } from './CodeViewer';
-import { ContextPanel } from './ContextPanel';
 import { ProfileCreationDialog } from './ProfileCreationDialog';
 import { VirtualizedSymbolList } from './VirtualizedSymbolList';
 import { useDebounce, usePerformanceMonitor } from '../hooks/usePerformance';
@@ -32,9 +31,10 @@ type DensityMode = 'compact' | 'comfortable' | 'detailed';
 
 interface SymbolExplorerProps {
   symbols: Symbol[];
+  onSymbolSelect?: (symbol: Symbol | null) => void;
 }
 
-export const SymbolExplorer = memo<SymbolExplorerProps>(({ symbols }) => {
+export const SymbolExplorer = memo<SymbolExplorerProps>(({ symbols, onSymbolSelect }) => {
   const { } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
@@ -42,7 +42,6 @@ export const SymbolExplorer = memo<SymbolExplorerProps>(({ symbols }) => {
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [viewingSymbol, setViewingSymbol] = useState<Symbol | null>(null);
   const [densityMode, setDensityMode] = useState<DensityMode>('comfortable');
-  const [showContextInline, setShowContextInline] = useState(false);
 
   // Performance monitoring
   usePerformanceMonitor('SymbolExplorer');
@@ -89,7 +88,7 @@ export const SymbolExplorer = memo<SymbolExplorerProps>(({ symbols }) => {
         break;
       case 'context':
         setSelectedSymbol(symbol);
-        setShowContextInline(true);
+        onSymbolSelect?.(symbol);
         break;
       case 'copy':
         navigator.clipboard.writeText(symbol.location.path);
@@ -102,8 +101,15 @@ export const SymbolExplorer = memo<SymbolExplorerProps>(({ symbols }) => {
   }, []);
 
   const handleSymbolSelect = useCallback((symbol: Symbol) => {
-    setSelectedSymbol(symbol);
-  }, []);
+    // Toggle selection - if clicking the same symbol, deselect it
+    if (selectedSymbol?.identifier === symbol.identifier) {
+      setSelectedSymbol(null);
+      onSymbolSelect?.(null);
+    } else {
+      setSelectedSymbol(symbol);
+      onSymbolSelect?.(symbol);
+    }
+  }, [selectedSymbol, onSymbolSelect]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     debouncedSetSearchTerm(e.target.value);
@@ -215,44 +221,7 @@ export const SymbolExplorer = memo<SymbolExplorerProps>(({ symbols }) => {
         )}
       </div>
 
-      {/* Inline Context (only when enabled and symbol selected) */}
-      {showContextInline && selectedSymbol && (
-        <div className="border-t border-border max-h-48 overflow-y-auto">
-          <div className="p-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground">
-                Context for {selectedSymbol.identifier}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowContextInline(false)}
-                className="h-5 w-5 p-0"
-              >
-                ×
-              </Button>
-            </div>
-            <ContextPanel 
-              symbol={selectedSymbol} 
-              onFileClick={(filePath) => {
-                console.log('File clicked:', filePath);
-              }}
-            />
-          </div>
-        </div>
-      )}
 
-      {/* Context Panel (traditional bottom panel when not inline) */}
-      {selectedSymbol && !showContextInline && (
-        <div className="border-t border-border">
-          <ContextPanel 
-            symbol={selectedSymbol} 
-            onFileClick={(filePath) => {
-              console.log('File clicked:', filePath);
-            }}
-          />
-        </div>
-      )}
 
       {/* Code Viewer Modal */}
       {viewingSymbol && (

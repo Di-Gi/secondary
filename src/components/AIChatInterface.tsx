@@ -291,14 +291,12 @@ export function AIChatInterface({ selectedSymbol }: AIChatInterfaceProps) {
                   {message.role === 'user' && (message.symbolContext || message.profileContext) && (
                     <div className="space-y-1 mb-2">
                       {message.symbolContext && (
-                        // CHANGED: Using theme-aware color with opacity for better contrast
                         <div className="flex items-center gap-2 text-primary-foreground/80 text-xs">
                           <Sparkles className="h-3 w-3" />
                           <span>Symbol: {message.symbolContext.identifier} ({message.symbolContext.kind})</span>
                         </div>
                       )}
                       {message.profileContext && (
-                        // CHANGED: Using theme-aware color with opacity for better contrast
                         <div className="flex items-center gap-2 text-primary-foreground/80 text-xs">
                           <FolderOpen className="h-3 w-3" />
                           <span>Profile: {message.profileContext.profileName} ({message.profileContext.fileCount} files)</span>

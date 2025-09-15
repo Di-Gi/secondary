@@ -5,14 +5,12 @@
 
 import { useState, useEffect } from 'react';
 import { Symbol, ContextPackage, FileContext, api } from '../api';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { LoadingSpinner } from './ui/loading-spinner';
 import { cleanPath, getFileName } from '../utils/pathUtils';
 import {
-  ChevronDown,
-  ChevronRight,
   FileText,
   Eye,
   ExternalLink,
@@ -31,6 +29,7 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['used_by']));
+  const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact');
 
   useEffect(() => {
     collectContext();
@@ -166,6 +165,15 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
               </Badge>
             </button>
           ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setViewMode(viewMode === 'compact' ? 'detailed' : 'compact')}
+            className="h-6 px-2 text-xs"
+            title={viewMode === 'compact' ? 'Switch to detailed view' : 'Switch to compact view'}
+          >
+            {viewMode === 'compact' ? <Eye className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+          </Button>
         </div>
       </div>
 
@@ -175,11 +183,19 @@ export function ContextPanel({ symbol, onFileClick }: ContextPanelProps) {
           <div key={section.id} className="flex-1 border-r border-border last:border-r-0 overflow-hidden">
             <div className="h-full overflow-y-auto">
               {section.items.map((item, index) => (
-                <CompactFileContextItem
-                  key={`${item.path}-${index}`}
-                  fileContext={item}
-                  onClick={() => handleFileClick(item)}
-                />
+                viewMode === 'compact' ? (
+                  <CompactFileContextItem
+                    key={`${item.path}-${index}`}
+                    fileContext={item}
+                    onClick={() => handleFileClick(item)}
+                  />
+                ) : (
+                  <FileContextItem
+                    key={`${item.path}-${index}`}
+                    fileContext={item}
+                    onClick={() => handleFileClick(item)}
+                  />
+                )
               ))}
             </div>
           </div>

@@ -1,12 +1,12 @@
 // [[SECONDARY_MIND_DESKTOP]]/src/components/ui/titlebar.tsx
 // Purpose: Custom titlebar component with platform-specific styling and window controls.
 // Architecture: React component that provides native-like window controls and drag region.
-// Dependencies: Tauri window API, platform detection.
+// Dependencies: Safe Tauri API wrappers, platform detection.
 
 import { useEffect, useState } from 'react';
-import { appWindow } from '@tauri-apps/api/window';
 import { Minus, Square, X } from 'lucide-react';
 import { isMacOS } from '../../utils/platform';
+import { safeWindow, isDevelopmentMode, isTauriAvailable } from '../../utils/tauri';
 
 interface TitlebarProps {
   title?: string;
@@ -19,44 +19,74 @@ export function Titlebar({ title = "Secondary Mind" }: TitlebarProps) {
   useEffect(() => {
     // Check platform and window state
     const initializeTitlebar = async () => {
-      const macOS = await isMacOS();
-      setShouldRender(!macOS);
-      
-      if (!macOS) {
-        const maximized = await appWindow.isMaximized();
-        setIsMaximized(maximized);
+      try {
+        // Don't render titlebar if we're in web development mode (no Tauri context)
+        const isDevMode = isDevelopmentMode();
+        const hasTauri = isTauriAvailable();
+
+        if (isDevMode && !hasTauri) {
+          setShouldRender(false);
+          return;
+        }
+
+        const macOS = await isMacOS();
+        setShouldRender(!macOS);
+
+        if (!macOS) {
+          const maximized = await safeWindow.isMaximized();
+          setIsMaximized(maximized);
+        }
+      } catch (error) {
+        console.error('Failed to initialize titlebar:', error);
+        // On error, only hide titlebar if we're definitely in web development mode
+        setShouldRender(isTauriAvailable());
       }
     };
 
     initializeTitlebar();
 
     // Listen for window resize events
-    const unlisten = appWindow.onResized(() => {
-      appWindow.isMaximized().then(setIsMaximized);
+    const setupResizeListener = async () => {
+      try {
+        const unlisten = await safeWindow.onResized(() => {
+          safeWindow.isMaximized().then(setIsMaximized).catch(console.error);
+        });
+        return unlisten;
+      } catch (error) {
+        console.error('Failed to setup resize listener:', error);
+        return () => {}; // No-op cleanup function
+      }
+    };
+
+    let cleanupFn: (() => void) | null = null;
+    setupResizeListener().then(fn => {
+      cleanupFn = fn;
     });
 
     return () => {
-      unlisten.then(fn => fn());
+      if (cleanupFn) {
+        cleanupFn();
+      }
     };
   }, []);
 
   const handleMinimize = () => {
-    appWindow.minimize();
+    safeWindow.minimize();
   };
 
   const handleMaximize = () => {
     if (isMaximized) {
-      appWindow.unmaximize();
+      safeWindow.unmaximize();
     } else {
-      appWindow.maximize();
+      safeWindow.maximize();
     }
   };
 
   const handleClose = () => {
-    appWindow.close();
+    safeWindow.close();
   };
 
-  // Don't render titlebar on macOS (uses native overlay)
+  // Don't render titlebar on macOS (uses native overlay) or in web development mode
   if (!shouldRender) {
     return null;
   }

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { open } from '@tauri-apps/api/dialog';
 import { useAppStore } from '../store/appStore';
+import { useUIStore } from '../store/uiStore';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
@@ -23,16 +24,18 @@ import {
   ArrowRight,
   Sparkles
 } from 'lucide-react';
-import { isDevelopmentMode, ProjectConfig } from '../api';
+import { ProjectConfig } from '../api';
+import { isDevelopmentMode, isTauriAvailable } from '../utils/tauri';
 
 export function ProjectDashboard() {
-  const { 
-    loadProject, 
-    recentProjects, 
-    loadRecentProjects, 
+  const {
+    loadProject,
+    recentProjects,
+    loadRecentProjects,
     removeProjectFromRecent,
-    isLoading 
+    isLoading
   } = useAppStore();
+  const { setCurrentView } = useUIStore();
   
   const [dragOver, setDragOver] = useState(false);
   const [removingProject, setRemovingProject] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export function ProjectDashboard() {
 
   const handleSelectProject = async () => {
     try {
-      if (isDevelopmentMode()) {
+      if (isDevelopmentMode() && !isTauriAvailable()) {
         await loadProject('/mock/project/path');
         return;
       }
@@ -82,7 +85,7 @@ export function ProjectDashboard() {
     e.preventDefault();
     setDragOver(false);
 
-    if (isDevelopmentMode()) {
+    if (isDevelopmentMode() && !isTauriAvailable()) {
       await loadProject('/mock/dropped/project');
       return;
     }
@@ -134,10 +137,25 @@ export function ProjectDashboard() {
             AI-powered codebase analysis and development guidance.
             Understand your code better, faster.
           </p>
-          {isDevelopmentMode() && (
+          {isDevelopmentMode() && !isTauriAvailable() && (
             <div className="mt-6 inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-4 py-2">
               <div className="h-2 w-2 bg-primary rounded-full animate-pulse"></div>
               <span className="text-primary text-sm font-medium">Development Mode</span>
+            </div>
+          )}
+
+          {/* Demo Page Button - Only show in web development mode */}
+          {isDevelopmentMode() && !isTauriAvailable() && (
+            <div className="mt-6">
+              <Button
+                onClick={() => setCurrentView('demo')}
+                variant="outline"
+                size="lg"
+                className="h-12 px-6 text-base font-medium"
+              >
+                <Sparkles className="h-5 w-5 mr-2" />
+                Hackathon Demo Page
+              </Button>
             </div>
           )}
         </div>

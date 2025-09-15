@@ -5,9 +5,10 @@
 
 import { useEffect, memo } from 'react';
 import { useAppStore } from './store/appStore';
-import { useTheme } from './store/uiStore';
+import { useTheme, useCurrentView } from './store/uiStore';
 import { ProjectDashboard } from './components/ProjectDashboard';
 import { ProjectWorkspace } from './components/ProjectWorkspace';
+import { HackathonDemo } from './components/HackathonDemo';
 import { Toaster } from './components/ui/sonner';
 import { LoadingSpinner } from './components/ui/loading-spinner';
 import { Titlebar } from './components/ui/titlebar';
@@ -18,6 +19,7 @@ import { usePerformanceMonitor } from './hooks/usePerformance';
 const App = memo(() => {
   const { currentProject, isLoading, error, initializeApp } = useAppStore();
   const theme = useTheme();
+  const currentView = useCurrentView();
 
   // Performance monitoring in development
   usePerformanceMonitor('App');
@@ -74,15 +76,23 @@ const App = memo(() => {
     );
   }
 
+  const renderCurrentView = () => {
+    if (currentView === 'demo') {
+      return <HackathonDemo />;
+    }
+
+    if (currentProject) {
+      return <ProjectWorkspace />;
+    }
+
+    return <ProjectDashboard />;
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <Titlebar />
       <div className="flex-1 overflow-hidden">
-        {currentProject ? (
-          <ProjectWorkspace />
-        ) : (
-          <ProjectDashboard />
-        )}
+        {renderCurrentView()}
       </div>
       <Toaster />
     </div>

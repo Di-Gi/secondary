@@ -1,12 +1,14 @@
 {
   "name": "secondary-mind-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:demo": "tsc && vite build --mode demo --base=/secondary/",
     "preview": "vite preview",
+    "deploy": "npm run build:demo && gh-pages -d dist",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
@@ -48,6 +50,7 @@
     "eslint": "^8.53.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4",
+    "gh-pages": "^6.1.1",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
     "tailwindcss-animate": "^1.0.7",

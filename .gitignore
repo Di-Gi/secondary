@@ -1,6 +1,0 @@
-node_modules
-*.lock
-target
-*.xml
-.structure.json
-dist

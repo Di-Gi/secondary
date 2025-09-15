@@ -5,18 +5,20 @@ import { subscribeWithSelector } from 'zustand/middleware';
 interface UIState {
   // Theme
   theme: 'light' | 'dark';
-  
+
   // UI state
   activeTab: 'chat' | 'notes';
   sidebarCollapsed: boolean;
   sidebarWidth: number;
-  
+  currentView: 'dashboard' | 'workspace' | 'demo';
+
   // Actions
   setTheme: (theme: 'light' | 'dark') => void;
   toggleTheme: () => void;
   setActiveTab: (tab: 'chat' | 'notes') => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSidebarWidth: (width: number) => void;
+  setCurrentView: (view: 'dashboard' | 'workspace' | 'demo') => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -26,6 +28,7 @@ export const useUIStore = create<UIState>()(
     activeTab: 'chat',
     sidebarCollapsed: false,
     sidebarWidth: 350,
+    currentView: 'dashboard',
 
     // Actions
     setTheme: (theme) => {
@@ -50,12 +53,14 @@ export const useUIStore = create<UIState>()(
     setActiveTab: (tab) => set({ activeTab: tab }),
     setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
     setSidebarWidth: (width) => set({ sidebarWidth: width }),
+    setCurrentView: (view) => set({ currentView: view }),
   }))
 );
 
 // Selectors for optimized subscriptions
 export const useTheme = () => useUIStore((state) => state.theme);
 export const useActiveTab = () => useUIStore((state) => state.activeTab);
+export const useCurrentView = () => useUIStore((state) => state.currentView);
 export const useSidebarState = () => useUIStore((state) => ({
   collapsed: state.sidebarCollapsed,
   width: state.sidebarWidth,

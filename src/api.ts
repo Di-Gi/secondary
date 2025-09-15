@@ -141,14 +141,11 @@ export interface FileStatus {
   last_modified?: string;
 }
 
-// Check if we're running in Tauri environment
-const isTauri = () => {
-  try {
-    return typeof window !== 'undefined' && '__TAURI__' in window;
-  } catch {
-    return false;
-  }
-};
+// Import our improved Tauri detection
+import { isTauriAvailable } from './utils/tauri';
+
+// Use our robust Tauri detection
+const isTauri = isTauriAvailable;
 
 // Mock data for development mode (enhanced with project configs)
 const MOCK_RECENT_PROJECTS: RecentProjects = {
@@ -203,7 +200,38 @@ const MOCK_PROJECT_NOTES: ProjectNote[] = [
   },
 ];
 
-const MOCK_PROFILES: DevelopmentProfile[] = [];
+const MOCK_PROFILES: DevelopmentProfile[] = [
+  {
+    id: 'mock-profile-1',
+    name: 'Authentication System',
+    description: 'Core authentication and user management components',
+    tags: ['auth', 'security', 'frontend'],
+    files: [
+      'src/components/auth/LoginForm.tsx',
+      'src/components/auth/SignupForm.tsx',
+      'src/services/authService.ts',
+      'src/hooks/useAuth.ts'
+    ],
+    created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+    last_used: new Date(Date.now() - 3600000).toISOString(),
+    usage_count: 5
+  },
+  {
+    id: 'mock-profile-2',
+    name: 'Dashboard Components',
+    description: 'Main dashboard and data visualization components',
+    tags: ['dashboard', 'ui', 'charts'],
+    files: [
+      'src/components/Dashboard.tsx',
+      'src/components/charts/LineChart.tsx',
+      'src/components/charts/BarChart.tsx',
+      'src/utils/chartHelpers.ts'
+    ],
+    created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
+    last_used: new Date(Date.now() - 86400000).toISOString(),
+    usage_count: 12
+  }
+];
 
 // Enhanced API functions
 export const api = {

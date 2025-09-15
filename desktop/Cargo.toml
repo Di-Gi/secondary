@@ -29,6 +29,10 @@ chrono = "0.4.41"
 serde_json.workspace = true
 serde_yaml = "0.9"
 
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
 [[bin]]
 name = "secondary-mind-desktop"
 path = "src/main.rs"

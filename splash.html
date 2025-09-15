@@ -5,63 +5,184 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secondary Mind</title>
     <style>
-        body {
+        :root {
+            --background: 0 0% 100%;
+            --foreground: 0 0% 3.9%;
+            --primary: 0 0% 9%;
+            --primary-foreground: 0 0% 98%;
+            --muted: 0 0% 96.1%;
+            --muted-foreground: 0 0% 45.1%;
+            --border: 0 0% 89.8%;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background: 0 0% 3.9%;
+                --foreground: 0 0% 98%;
+                --primary: 0 0% 98%;
+                --primary-foreground: 0 0% 9%;
+                --muted: 0 0% 14.9%;
+                --muted-foreground: 0 0% 63.9%;
+                --border: 0 0% 14.9%;
+            }
+        }
+
+        * {
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: hsl(var(--background));
+            color: hsl(var(--foreground));
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
-            color: white;
             overflow: hidden;
+            transition: background-color 0.15s ease-out, color 0.15s ease-out;
         }
-        
-        .logo {
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            text-align: center;
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            animation: fadeIn 0.6s ease-out;
+            padding: 1rem;
         }
-        
-        .loading {
+
+        .logo-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            opacity: 0.9;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            background: hsl(var(--primary));
+            border-radius: 0.75rem;
+            padding: 0.625rem;
         }
-        
+
+        .sparkles-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            color: hsl(var(--primary-foreground));
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: hsl(var(--foreground));
+            text-align: center;
+        }
+
+        .tagline {
+            font-size: 0.875rem;
+            color: hsl(var(--muted-foreground));
+            text-align: center;
+            max-width: 280px;
+            line-height: 1.4;
+        }
+
+        .loading-section {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: hsl(var(--muted) / 0.3);
+            border: 1px solid hsl(var(--border));
+            border-radius: 0.375rem;
+        }
+
         .spinner {
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top: 2px solid white;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid hsl(var(--muted-foreground) / 0.3);
+            border-top: 2px solid hsl(var(--primary));
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        
+
+        .loading-text {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .version {
+            position: absolute;
+            bottom: 0.75rem;
+            font-size: 0.625rem;
+            color: hsl(var(--muted-foreground));
+            opacity: 0.7;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
-        .version {
-            position: absolute;
-            bottom: 20px;
-            font-size: 12px;
-            opacity: 0.7;
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
     </style>
 </head>
 <body>
-    <div class="logo">Secondary Mind</div>
-    <div class="loading">
-        <div class="spinner"></div>
-        <span>Initializing...</span>
+    <div class="container">
+        <div class="logo-section">
+            <div class="logo-icon">
+                <!-- Sparkles SVG Icon matching Lucide React -->
+                <svg class="sparkles-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                    <path d="M5 3v4"/>
+                    <path d="M19 17v4"/>
+                    <path d="M3 5h4"/>
+                    <path d="M17 19h4"/>
+                </svg>
+            </div>
+            <h1 class="logo-text">Secondary Mind</h1>
+        </div>
+
+        <p class="tagline">
+            AI-powered codebase analysis and development guidance
+        </p>
+
+        <div class="loading-section">
+            <div class="spinner"></div>
+            <span class="loading-text">Initializing...</span>
+        </div>
     </div>
+
     <div class="version">v0.1.0</div>
 </body>
 </html>

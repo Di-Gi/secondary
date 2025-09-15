@@ -1,9 +1,9 @@
 // [[SECONDARY_MIND_DESKTOP]]/src/utils/platform.ts
 // Purpose: Platform detection utilities for conditional rendering and behavior.
 // Architecture: Simple utility functions for platform-specific logic.
-// Dependencies: Tauri OS API.
+// Dependencies: Safe Tauri API wrappers.
 
-import { platform } from '@tauri-apps/api/os';
+import { safePlatform } from './tauri';
 
 let cachedPlatform: string | null = null;
 
@@ -12,7 +12,7 @@ let cachedPlatform: string | null = null;
  */
 export async function getPlatform(): Promise<string> {
   if (cachedPlatform === null) {
-    cachedPlatform = await platform();
+    cachedPlatform = await safePlatform();
   }
   return cachedPlatform;
 }

@@ -1,9 +1,9 @@
 // [[SECONDARY_MIND_DESKTOP]]/src/init.ts
 // Purpose: Frontend initialization handler that signals backend when React app is ready.
 // Architecture: Simple event-based communication with the Tauri backend.
-// Dependencies: Tauri API for invoking backend commands.
+// Dependencies: Safe Tauri API wrappers.
 
-import { invoke } from '@tauri-apps/api/tauri';
+import { safeInvoke } from './utils/tauri';
 
 /**
  * Signals the backend that the frontend is fully initialized and ready.
@@ -11,7 +11,9 @@ import { invoke } from '@tauri-apps/api/tauri';
  */
 export async function signalFrontendReady(): Promise<void> {
   try {
-    await invoke('frontend_ready');
+    await safeInvoke('frontend_ready', undefined, () => {
+      console.log('🔧 Development mode: Frontend ready signal simulated');
+    });
     console.log('Frontend ready signal sent to backend');
   } catch (error) {
     console.error('Failed to signal frontend ready:', error);

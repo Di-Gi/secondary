@@ -18,6 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { cleanPath } from '../utils/pathUtils';
 
 interface ChatMessage {
   id: string;
@@ -70,7 +71,6 @@ export function AIChatInterface({ selectedSymbol }: AIChatInterfaceProps) {
     // Add selected symbol context
     if (selectedSymbol) {
       hasContext = true;
-      const { cleanPath } = await import('../utils/pathUtils');
       const cleanedPath = cleanPath(selectedSymbol.location.path);
       
       contextualQuery = `Context: I'm currently looking at the symbol "${selectedSymbol.identifier}" (${selectedSymbol.kind}) located at ${cleanedPath}:${selectedSymbol.location.line}.\n\n`;

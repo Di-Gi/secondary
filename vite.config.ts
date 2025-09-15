@@ -6,10 +6,14 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { copyFileSync } from "fs";
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+
+  // Configure base path for GitHub Pages when in demo mode
+  base: mode === 'demo' ? '/secondary/' : '/',
 
   // Vite options tailored for Tauri development and to use `tauri://localhost` in production
   clearScreen: false,
@@ -43,6 +47,20 @@ export default defineConfig(async () => ({
           utils: ['zustand', 'clsx', 'tailwind-merge'],
         },
       },
+      plugins: [
+        {
+          name: 'copy-splash',
+          writeBundle() {
+            // Copy splash.html to dist directory for Tauri splash screen
+            try {
+              copyFileSync('splash.html', 'dist/splash.html');
+              console.log('✓ Copied splash.html to dist/');
+            } catch (error) {
+              console.warn('Warning: Failed to copy splash.html:', error.message);
+            }
+          }
+        }
+      ]
     },
     // Optimize chunk size
     chunkSizeWarningLimit: 1000,

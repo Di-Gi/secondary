@@ -294,11 +294,11 @@ export function ProfileCreationDialog({
 
     return (
       <div key={node.path}>
-        <div 
+        <div
           className={cn(
             "flex items-center gap-2 py-1.5 px-2 hover:bg-muted/50 rounded-sm cursor-pointer transition-colors",
-            isSelected && !node.isDirectory && "bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500 dark:border-blue-400",
-            node.isDirectory && selectedChildrenCount > 0 && "bg-blue-25 dark:bg-blue-900/10"
+            isSelected && !node.isDirectory && (theme === 'dark' ? "bg-blue-900/20 border-l-2 border-blue-400" : "bg-blue-50 border-l-2 border-blue-500"),
+            node.isDirectory && selectedChildrenCount > 0 && (theme === 'dark' ? "bg-blue-900/10" : "bg-blue-25")
           )}
           style={{ paddingLeft: `${depth * 20 + 8}px` }}
           onClick={() => {
@@ -312,7 +312,7 @@ export function ProfileCreationDialog({
           {node.isDirectory ? (
             <>
               {node.isExpanded ? (
-                <FolderOpen className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <FolderOpen className={cn("h-4 w-4 flex-shrink-0", theme === 'dark' ? "text-blue-400" : "text-blue-600")} />
               ) : (
                 <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               )}

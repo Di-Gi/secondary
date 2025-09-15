@@ -28,7 +28,7 @@ export const useUIStore = create<UIState>()(
     activeTab: 'chat',
     sidebarCollapsed: false,
     sidebarWidth: 350,
-    currentView: 'dashboard',
+    currentView: 'demo',
 
     // Actions
     setTheme: (theme) => {

@@ -132,14 +132,14 @@ export function HackathonDemo() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="max-w-7xl mx-auto px-6 py-12">
+    <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 min-h-full">
         {/* Navigation Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-4">
           <Button
             variant="outline"
             onClick={() => setCurrentView('dashboard')}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 w-full sm:w-auto"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
@@ -148,19 +148,19 @@ export function HackathonDemo() {
           <Button
             variant="ghost"
             onClick={() => setCurrentView('dashboard')}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 w-full sm:w-auto justify-center"
           >
             <Home className="h-4 w-4" />
             Home
           </Button>
         </div>
         {/* Hero Section */}
-        <div className="text-center mb-20">
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="p-4 bg-primary rounded-2xl">
-              <Sparkles className="h-12 w-12 text-primary-foreground" />
+        <div className="text-center mb-12 sm:mb-16 lg:mb-20">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+            <div className="p-3 sm:p-4 bg-primary rounded-2xl">
+              <Sparkles className="h-8 w-8 sm:h-10 w-10 lg:h-12 w-12 text-primary-foreground" />
             </div>
-            <h1 className="text-6xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
               Secondary Mind
             </h1>
           </div>
@@ -172,42 +172,42 @@ export function HackathonDemo() {
             </Badge>
           </div>
 
-          <p className="text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed mb-8">
+          <p className="text-lg sm:text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed mb-6 sm:mb-8 px-4">
             Revolutionary AI-powered codebase analysis and development guidance tool.
             Understand your code better, develop faster, and build smarter.
           </p>
 
-          <div className="flex flex-wrap justify-center gap-4 mb-12">
+          <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 sm:gap-4 mb-8 sm:mb-12 px-4">
             <Button
               size="lg"
-              className="h-14 px-8 text-lg font-semibold"
+              className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg font-semibold w-full sm:w-auto"
               onClick={() => setShowPreview(true)}
             >
-              <Play className="h-6 w-6 mr-3" />
+              <Play className="h-5 w-5 sm:h-6 w-6 mr-2 sm:mr-3" />
               Try Live Demo
             </Button>
             <Button
               variant="outline"
               size="lg"
-              className="h-14 px-8 text-lg font-semibold"
-              onClick={() => window.open('https://github.com/Di-Gi/secondary/releases', '_blank')}
+              className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg font-semibold w-full sm:w-auto"
+              onClick={() => window.open('https://github.com/Di-Gi/secondary/releases/tag/v.0.1.3-hackathon', '_blank')}
             >
-              <Download className="h-6 w-6 mr-3" />
+              <Download className="h-5 w-5 sm:h-6 w-6 mr-2 sm:mr-3" />
               Download App
             </Button>
             <Button
               variant="outline"
               size="lg"
-              className="h-14 px-8 text-lg font-semibold"
+              className="h-12 sm:h-14 px-6 sm:px-8 text-base sm:text-lg font-semibold w-full sm:w-auto"
               onClick={() => window.open('https://github.com/Di-Gi/secondary/tree/kiro', '_blank')}
             >
-              <Github className="h-6 w-6 mr-3" />
+              <Github className="h-5 w-5 sm:h-6 w-6 mr-2 sm:mr-3" />
               View Source
             </Button>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 max-w-3xl mx-auto px-4">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
                 <div className="flex items-center justify-center mb-2 text-primary">
@@ -221,15 +221,15 @@ export function HackathonDemo() {
         </div>
 
         {/* Features Grid */}
-        <div className="mb-20">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-foreground mb-4">Powerful Features</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+        <div className="mb-12 sm:mb-16 lg:mb-20">
+          <div className="text-center mb-8 sm:mb-12 px-4">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">Powerful Features</h2>
+            <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
               Built for developers who want to understand and navigate their codebases with AI assistance
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-4">
             {features.map((feature, index) => (
               <Card
                 key={index}
@@ -259,15 +259,15 @@ export function HackathonDemo() {
         </div>
 
         {/* Live Demo Section */}
-        <div className="mb-20">
+        <div className="mb-12 sm:mb-16 lg:mb-20 px-4">
           <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-purple-500/5">
-            <CardContent className="p-12">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <CardContent className="p-6 sm:p-8 lg:p-12">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 items-center">
                 <div>
-                  <h3 className="text-3xl font-bold text-foreground mb-6">
+                  <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-4 sm:mb-6">
                     Experience Secondary Mind
                   </h3>
-                  <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+                  <p className="text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 leading-relaxed">
                     Try our interactive demo with a sample TypeScript project. See how Secondary Mind
                     analyzes code structure, provides AI insights, and helps you understand complex codebases instantly.
                   </p>
@@ -289,12 +289,12 @@ export function HackathonDemo() {
 
                   <Button
                     size="lg"
-                    className="h-12 px-8 text-lg"
+                    className="h-12 px-6 sm:px-8 text-base sm:text-lg w-full sm:w-auto"
                     onClick={() => setCurrentView('dashboard')}
                   >
-                    <Play className="h-5 w-5 mr-3" />
+                    <Play className="h-4 w-4 sm:h-5 w-5 mr-2 sm:mr-3" />
                     Open Full Application
-                    <ArrowRight className="h-5 w-5 ml-3" />
+                    <ArrowRight className="h-4 w-4 sm:h-5 w-5 ml-2 sm:ml-3" />
                   </Button>
                 </div>
 
@@ -336,15 +336,15 @@ export function HackathonDemo() {
         </div>
 
         {/* Technology Stack */}
-        <div className="mb-20">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-foreground mb-4">Built with Modern Tech</h2>
-            <p className="text-xl text-muted-foreground">
+        <div className="mb-12 sm:mb-16 lg:mb-20">
+          <div className="text-center mb-8 sm:mb-12 px-4">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">Built with Modern Tech</h2>
+            <p className="text-lg sm:text-xl text-muted-foreground">
               Cutting-edge technologies for performance, reliability, and developer experience
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-3 sm:gap-4 px-4">
             {techStack.map((tech, index) => (
               <Badge
                 key={index}
@@ -358,17 +358,17 @@ export function HackathonDemo() {
         </div>
 
         {/* Hackathon Links */}
-        <div className="mb-20">
+        <div className="mb-12 sm:mb-16 lg:mb-20 px-4">
           <Card className="border-2 border-primary bg-primary/5">
-            <CardContent className="p-12">
-              <div className="text-center mb-8">
-                <h2 className="text-4xl font-bold text-foreground mb-4">Hackathon Submission</h2>
-                <p className="text-xl text-muted-foreground">
+            <CardContent className="p-6 sm:p-8 lg:p-12">
+              <div className="text-center mb-6 sm:mb-8">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">Hackathon Submission</h2>
+                <p className="text-lg sm:text-xl text-muted-foreground">
                   Explore our project, contribute to development, or download the application
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                 <Card className="border-2 border-border hover:border-primary/50 hover:shadow-md transition-all">
                   <CardContent className="p-6 text-center">
                     <Github className="h-12 w-12 text-foreground mx-auto mb-4" />
@@ -416,7 +416,7 @@ export function HackathonDemo() {
                     </p>
                     <Button
                       className="w-full"
-                      onClick={() => window.open('https://github.com/Di-Gi/secondary/releases', '_blank')}
+                      onClick={() => window.open('https://github.com/Di-Gi/secondary/releases/tag/v.0.1.3-hackathon', '_blank')}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download Now
@@ -430,7 +430,7 @@ export function HackathonDemo() {
         </div>
 
         {/* Footer */}
-        <div className="text-center border-t border-border pt-12">
+        <div className="text-center border-t border-border pt-8 sm:pt-12 px-4">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Sparkles className="h-6 w-6 text-primary" />
             <span className="text-lg font-semibold text-foreground">Secondary Mind</span>
@@ -443,8 +443,8 @@ export function HackathonDemo() {
         {/* Preview Modal */}
         {showPreview && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-background border border-border rounded-xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-              <div className="flex items-center justify-between p-6 border-b border-border">
+            <div className="bg-background border border-border rounded-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border">
                 <div className="flex items-center gap-3">
                   <Sparkles className="h-6 w-6 text-primary" />
                   <h3 className="text-xl font-semibold">Secondary Mind Preview</h3>
@@ -459,13 +459,13 @@ export function HackathonDemo() {
                 </Button>
               </div>
 
-              <div className="p-6 space-y-6">
+              <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 <div className="text-center space-y-4">
-                  <div className="text-lg text-muted-foreground">
+                  <div className="text-base sm:text-lg text-muted-foreground">
                     This preview shows the core interface of Secondary Mind
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 text-sm">
                     <div className="p-4 bg-muted/50 rounded-lg">
                       <Code className="h-6 w-6 text-blue-500 mx-auto mb-2" />
                       <div className="font-medium">Symbol Explorer</div>

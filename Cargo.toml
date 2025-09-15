@@ -9,7 +9,7 @@ members = [
 # Optional: You can define default package metadata that all
 # workspace members will inherit. This helps keep things consistent.
 [workspace.package]
-version = "0.1.1"
+version = "0.1.3"
 edition = "2021"
 authors = ["DG"]
 description = "Secondary Mind: AI-powered codebase analysis and development guidance."
